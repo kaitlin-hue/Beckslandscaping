@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Canvas Collective &middot; The Long Game</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
+  :root{
+    --ink:#0A0A0A; --cream:#F4EDE3; --stone:#9C8E80; --ash:#5C544C;
+    --line:rgba(10,10,10,.14);
+    --font:'Montserrat',-apple-system,'Helvetica Neue',Helvetica,Arial,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{scroll-behavior:smooth}
+  body{font-family:var(--font);background:var(--cream);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:760px;margin:0 auto;padding:0 24px}
+
+  /* ---------- header ---------- */
+  header{padding:34px 0 0}
+  .wm{font-weight:300;letter-spacing:.42em;font-size:15px;text-transform:uppercase}
+  .tag{font-weight:500;letter-spacing:.32em;font-size:8px;text-transform:uppercase;color:var(--stone);margin-top:5px}
+
+  /* ---------- intro ---------- */
+  .intro{padding:54px 0 10px;text-align:center}
+  .eyebrow{font-weight:600;letter-spacing:.3em;font-size:10.5px;text-transform:uppercase;color:var(--stone)}
+  h1{font-weight:300;font-size:clamp(2.4rem,8vw,4rem);letter-spacing:-.02em;line-height:1.05;margin-top:14px}
+  .lede{font-weight:400;font-size:15.5px;color:var(--ash);margin:20px auto 0;max-width:46ch;line-height:1.75}
+
+  /* ---------- wheel ---------- */
+  .wheel-stage{position:relative;display:flex;flex-direction:column;align-items:center;padding:56px 0 20px}
+  .wheel-frame{position:relative;width:min(78vw,380px);aspect-ratio:1/1}
+  .pointer{position:absolute;top:-2px;left:50%;transform:translateX(-50%);z-index:3;
+    width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-top:18px solid var(--ink)}
+  .wheel-disc{width:100%;height:100%;display:block;transition:transform 4.2s cubic-bezier(.15,.68,.16,1)}
+  .wheel-disc.spinning{cursor:default}
+  .hub-btn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:4;
+    width:27%;height:27%;border-radius:50%;background:var(--ink);color:var(--cream);border:none;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;
+    font-family:var(--font);box-shadow:0 0 0 6px var(--cream);transition:transform .15s}
+  .hub-btn:active{transform:translate(-50%,-50%) scale(.96)}
+  .hub-btn .go{font-weight:600;letter-spacing:.14em;font-size:10.5px;text-transform:uppercase}
+  .hub-btn .sub{font-weight:400;font-size:7.5px;letter-spacing:.1em;color:var(--stone);text-transform:uppercase;margin-top:2px}
+  .hub-btn[disabled]{cursor:default}
+
+  .seg-label{font-family:var(--font);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em}
+  .seg-label.seg-ink{fill:var(--cream)}
+  .seg-label.seg-cream{fill:var(--ink)}
+  .seg-label.seg-stone{fill:var(--ink)}
+  .seg-icon path,.seg-icon circle{fill:none;stroke-width:1.3}
+  .seg-icon.seg-ink path,.seg-icon.seg-ink circle{stroke:var(--cream)}
+  .seg-icon.seg-cream path,.seg-icon.seg-cream circle{stroke:var(--ink)}
+  .seg-icon.seg-stone path,.seg-icon.seg-stone circle{stroke:var(--ink)}
+
+  .spin-cta{margin-top:26px;font-weight:600;letter-spacing:.16em;font-size:10px;text-transform:uppercase;color:var(--stone);text-align:center}
+
+  /* ---------- result ---------- */
+  .result{margin:44px auto 0;max-width:46ch;text-align:center;min-height:150px;
+    opacity:0;transform:translateY(10px);transition:opacity .5s ease,transform .5s ease}
+  .result.show{opacity:1;transform:translateY(0)}
+  .result .no{font-weight:600;letter-spacing:.28em;font-size:9.5px;text-transform:uppercase;color:var(--stone)}
+  .result h2{font-weight:400;font-size:26px;letter-spacing:-.005em;margin-top:10px}
+  .result p{font-weight:400;font-size:15px;color:var(--ash);margin-top:12px;line-height:1.7}
+  .result .rule{width:34px;height:1px;background:var(--ink);margin:20px auto 0}
+
+  /* ---------- the thesis ---------- */
+  .thesis{padding:88px 0 70px;border-top:1px solid var(--line);margin-top:70px}
+  .thesis .eyebrow{text-align:left}
+  .thesis h2{font-weight:300;font-size:clamp(1.6rem,4.4vw,2.2rem);letter-spacing:-.015em;line-height:1.22;margin-top:16px;max-width:26ch}
+  .thesis-grid{margin-top:44px;display:grid;grid-template-columns:1fr;gap:1px;background:var(--line);border:1px solid var(--line)}
+  @media(min-width:640px){.thesis-grid{grid-template-columns:1fr 1fr}}
+  .tcard{background:var(--cream);padding:26px 24px}
+  .tcard .n{font-weight:600;letter-spacing:.14em;font-size:9px;text-transform:uppercase;color:var(--stone)}
+  .tcard p{font-weight:400;font-size:14.5px;color:var(--ink);margin-top:10px;line-height:1.6}
+
+  /* ---------- closer ---------- */
+  .closer{padding:70px 0 60px;text-align:center;border-top:1px solid var(--line)}
+  .closer .promise{font-weight:300;font-style:italic;font-size:clamp(1.3rem,3.6vw,1.7rem);letter-spacing:-.01em;line-height:1.35}
+  .closer .foot{margin-top:30px;font-weight:600;letter-spacing:.22em;font-size:9.5px;text-transform:uppercase;color:var(--stone)}
+
+  @media (prefers-reduced-motion: reduce){
+    .wheel-disc{transition:none}
+    .result{transition:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="wm">Canvas.</div>
+    <div class="tag">Cosmetic Clinic</div>
+  </header>
+
+  <section class="intro">
+    <div class="eyebrow">Canvas Collective</div>
+    <h1>The Long Game.</h1>
+    <p class="lede">Not a single treatment. A plan held across every pillar, for as long as it takes to get it right. Turn the dial to see how each one plays into the others.</p>
+  </section>
+
+  <section class="wheel-stage">
+    <div class="wheel-frame">
+      <div class="pointer" aria-hidden="true"></div>
+      <svg id="wheel" class="wheel-disc" viewBox="0 0 400 400" role="img" aria-label="The five pillars of Canvas Collective">
+        <!-- segments injected by script -->
+      </svg>
+      <button class="hub-btn" id="spinBtn" type="button">
+        <span class="go">Turn</span>
+        <span class="sub">the dial</span>
+      </button>
+    </div>
+    <div class="spin-cta" id="spinCue">Tap the centre to begin</div>
+
+    <div class="result" id="result">
+      <div class="no">Landed on</div>
+      <h2 id="resultTitle">&nbsp;</h2>
+      <div class="rule"></div>
+      <p id="resultBody">&nbsp;</p>
+    </div>
+  </section>
+
+  <section class="thesis">
+    <div class="eyebrow">Why a membership, not a menu</div>
+    <h2>Skin, hair, weight and hormones are read together, because they were never separate.</h2>
+    <div class="thesis-grid">
+      <div class="tcard">
+        <div class="n">01 &middot; The read</div>
+        <p>One consult, one blood panel. What shows up in the skin or the scale is often written first in the bloodwork.</p>
+      </div>
+      <div class="tcard">
+        <div class="n">02 &middot; The plan</div>
+        <p>Twelve months, mapped across all five pillars, held by one team. Nothing chosen in isolation.</p>
+      </div>
+      <div class="tcard">
+        <div class="n">03 &middot; The pace</div>
+        <p>Adjusted quarterly, not chased weekly. The long game rewards patience the quick fix never earns.</p>
+      </div>
+      <div class="tcard">
+        <div class="n">04 &middot; The hold</div>
+        <p>One patient, one story. The membership is the place that story is kept, and returned to.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="closer">
+    <div class="wrap" style="padding:0">
+      <p class="promise">Treatments you don't have to explain.</p>
+      <div class="foot">Canvas Collective &middot; The Long Game</div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  var PILLARS = [
+    { key:'skin', label:'Skin', tone:'ink',
+      icon:'<path d="M16 4c5 4 9 9 9 15a9 9 0 1 1-18 0c0-6 4-11 9-15Z"/>',
+      body:'Consistency compounds. Skin held to a plan outperforms skin treated in a panic.' },
+    { key:'hair', label:'Hair & Scalp', tone:'cream',
+      icon:'<path d="M9 5c2 6-2 8 0 14M16 5c2 6-2 8 0 14M23 5c2 6-2 8 0 14"/>',
+      body:'Hair answers to time, not urgency. The scalp is treated as skin, because it is.' },
+    { key:'weight', label:'Weight', tone:'ink',
+      icon:'<path d="M16 6v3M9 9h14l2 15a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L9 9Z"/><path d="M12 14a4 4 0 0 0 8 0"/>',
+      body:'Not a before and after. A number that holds, because the plan behind it does.' },
+    { key:'hormones', label:'Hormones', tone:'cream',
+      icon:'<circle cx="12" cy="12" r="3.5"/><circle cx="21" cy="12" r="2"/><circle cx="16" cy="22" r="2.5"/><path d="M14.8 14.4 18.6 19M14.3 10.8l4.2-.4"/>',
+      body:'The read that explains the rest. Skin, hair and weight often trace back here first.' },
+    { key:'aesthetics', label:'Medical Aesthetics', tone:'stone',
+      icon:'<path d="M16 4 27 12l-4 16H9L5 12 16 4Z"/><path d="M16 4v24M5 12h22"/>',
+      body:'Small, considered moves. Maintained quietly, adjusted rarely, never chased.' }
+  ];
+
+  var CX = 200, CY = 200, R = 196, SEG = 360 / PILLARS.length;
+
+  function polar(angleDeg, radius){
+    var rad = (angleDeg - 90) * Math.PI / 180;
+    return { x: CX + radius * Math.cos(rad), y: CY + radius * Math.sin(rad) };
+  }
+
+  var svg = document.getElementById('wheel');
+  var frag = '';
+
+  PILLARS.forEach(function(p, i){
+    var start = i * SEG, end = start + SEG, mid = start + SEG / 2;
+    var p1 = polar(start, R), p2 = polar(end, R);
+    var large = SEG > 180 ? 1 : 0;
+    var fill = p.tone === 'ink' ? 'var(--ink)' : p.tone === 'stone' ? 'var(--stone)' : 'var(--cream)';
+    var stroke = 'var(--ink)';
+    frag += '<path class="seg-' + p.tone + '" d="M' + CX + ',' + CY + ' L' + p1.x.toFixed(2) + ',' + p1.y.toFixed(2) +
+      ' A' + R + ',' + R + ' 0 ' + large + ',1 ' + p2.x.toFixed(2) + ',' + p2.y.toFixed(2) + ' Z" ' +
+      'fill="' + fill + '" stroke="' + stroke + '" stroke-width="1.5"></path>';
+
+    var iconPt = polar(mid, R * 0.56);
+    var iconSize = 30;
+    frag += '<g class="seg-icon seg-' + p.tone + '" transform="translate(' + (iconPt.x - iconSize/2).toFixed(2) + ',' + (iconPt.y - iconSize/2).toFixed(2) + ')">' +
+      '<svg width="' + iconSize + '" height="' + iconSize + '" viewBox="0 0 32 32" fill="none">' + p.icon + '</svg></g>';
+
+    var labelPt = polar(mid, R * 0.84);
+    var rot = mid;
+    if (rot > 90 && rot < 270) rot += 180;
+    frag += '<text class="seg-label seg-' + p.tone + '" x="' + labelPt.x.toFixed(2) + '" y="' + labelPt.y.toFixed(2) +
+      '" text-anchor="middle" dominant-baseline="middle" transform="rotate(' + rot.toFixed(2) + ' ' + labelPt.x.toFixed(2) + ' ' + labelPt.y.toFixed(2) + ')">' +
+      p.label.toUpperCase() + '</text>';
+  });
+
+  frag += '<circle cx="' + CX + '" cy="' + CY + '" r="' + R + '" fill="none" stroke="var(--ink)" stroke-width="2"></circle>';
+  svg.innerHTML = frag;
+
+  var spinBtn = document.getElementById('spinBtn');
+  var spinCue = document.getElementById('spinCue');
+  var result = document.getElementById('result');
+  var resultTitle = document.getElementById('resultTitle');
+  var resultBody = document.getElementById('resultBody');
+  var currentRotation = 0;
+  var spinning = false;
+  var lastIndex = -1;
+
+  spinBtn.addEventListener('click', function(){
+    if (spinning) return;
+    spinning = true;
+    spinBtn.setAttribute('disabled', 'true');
+    result.classList.remove('show');
+    spinCue.textContent = 'Turning…';
+
+    var target;
+    do { target = Math.floor(Math.random() * PILLARS.length); } while (target === lastIndex && PILLARS.length > 1);
+    lastIndex = target;
+
+    // Segment i's centre sits at local angle i*SEG + SEG/2 (0 = top, clockwise).
+    // After rotating by currentRotation, that centre lands at (angle + currentRotation) mod 360.
+    // Solve for a currentRotation, always larger than the last, that brings it to 0 (the pointer).
+    var fullSpins = 6;
+    var landingOffset = target * SEG + SEG / 2;
+    var wobble = (Math.random() - 0.5) * (SEG * 0.3);
+    var base = Math.ceil((currentRotation + 1) / 360) * 360 + 360 * (fullSpins - 1);
+    currentRotation = base - landingOffset - wobble;
+
+    svg.style.transform = 'rotate(' + currentRotation + 'deg)';
+
+    setTimeout(function(){
+      var p = PILLARS[target];
+      resultTitle.textContent = p.label;
+      resultBody.textContent = p.body;
+      result.classList.add('show');
+      spinCue.textContent = 'Tap the centre to turn again';
+      spinBtn.removeAttribute('disabled');
+      spinning = false;
+    }, 4300);
+  });
+})();
+</script>
+
+</body>
+</html>
