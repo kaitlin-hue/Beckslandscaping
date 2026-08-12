@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Canvas Collective</title>
+<meta name="description" content="Twelve questions. One read. Find out where your Canvas Collective plan starts.">
+<meta name="robots" content="noindex">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
+  :root{
+    --ink:#0A0A0A; --cream:#F4EDE3; --stone:#9C8E80; --ash:#5C544C;
+    --line:rgba(10,10,10,.14);
+    --font:'Montserrat',-apple-system,'Helvetica Neue',Helvetica,Arial,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:var(--font);background:var(--cream);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased}
+
+  .stage{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+  .wrap{max-width:520px;margin:0 auto;padding:0 24px;width:100%}
+
+  /* ---------- header ---------- */
+  header{padding:26px 0 0}
+  .wm{font-weight:300;letter-spacing:.42em;font-size:15px;text-transform:uppercase}
+  .tag{font-weight:500;letter-spacing:.32em;font-size:8px;text-transform:uppercase;color:var(--stone);margin-top:5px}
+
+  /* ---------- progress ---------- */
+  .progress-track{height:1px;background:var(--line);margin-top:22px;position:relative}
+  .progress-fill{position:absolute;left:0;top:0;height:100%;background:var(--ink);width:0%;transition:none}
+  @media (prefers-reduced-motion: no-preference){ .progress-fill{transition:width .4s ease} }
+  .progress-label{font-weight:600;letter-spacing:.22em;font-size:9.5px;text-transform:uppercase;color:var(--stone);margin-top:14px}
+
+  /* ---------- screens ---------- */
+  main{flex:1;display:flex;flex-direction:column;justify-content:center;padding:34px 0 60px}
+  .screen{display:none}
+  .screen.active{display:block}
+  @media (prefers-reduced-motion: no-preference){
+    .screen.active{animation:rise .45s ease both}
+    @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  }
+
+  .back{display:inline-block;font-weight:600;letter-spacing:.14em;font-size:10px;text-transform:uppercase;color:var(--stone);text-decoration:none;margin-bottom:18px;background:none;border:none;font-family:var(--font);cursor:pointer;padding:4px 0}
+
+  h1{font-weight:300;font-size:clamp(1.7rem,7vw,2.3rem);letter-spacing:-.015em;line-height:1.18}
+  .lede{font-weight:400;font-size:14.5px;color:var(--ash);margin-top:14px;line-height:1.7;max-width:44ch}
+
+  /* ---------- capture gate ---------- */
+  .field{margin-top:18px}
+  .field label{display:block;font-weight:600;letter-spacing:.14em;font-size:9.5px;text-transform:uppercase;color:var(--stone);margin-bottom:8px}
+  .field input[type=text],.field input[type=email],.field input[type=tel]{
+    width:100%;height:50px;padding:0 14px;border:1px solid var(--line);border-radius:0;background:#fff;
+    font-family:var(--font);font-size:15px;color:var(--ink);outline:none;transition:none}
+  @media (prefers-reduced-motion: no-preference){ .field input{transition:border-color .15s ease} }
+  .field input:focus{border-color:var(--ink)}
+  .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+
+  .consent{margin-top:22px;display:flex;align-items:flex-start;gap:11px}
+  .consent input{width:18px;height:18px;flex:0 0 18px;margin-top:2px;accent-color:var(--ink)}
+  .consent label{font-weight:400;font-size:12.5px;color:var(--ash);line-height:1.6}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;width:100%;height:52px;margin-top:26px;
+    background:var(--ink);color:var(--cream);border:none;font-family:var(--font);
+    font-weight:600;letter-spacing:.16em;font-size:11.5px;text-transform:uppercase;cursor:pointer}
+  .btn[disabled]{opacity:.35;cursor:default}
+
+  /* ---------- question ---------- */
+  .q-text{font-weight:400;font-size:clamp(1.3rem,5.6vw,1.7rem);letter-spacing:-.005em;line-height:1.35;margin-top:16px}
+  .options{margin-top:30px;display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line)}
+  .opt{display:flex;align-items:center;gap:14px;background:var(--cream);border:none;text-align:left;
+    padding:18px 18px;font-family:var(--font);cursor:pointer;width:100%}
+  .opt .num{font-weight:600;font-size:11px;color:var(--stone);border:1px solid var(--stone);border-radius:50%;
+    width:22px;height:22px;flex:0 0 22px;display:flex;align-items:center;justify-content:center}
+  .opt .lbl{font-weight:500;font-size:15px;color:var(--ink)}
+  .opt:active{background:#efe6d8}
+  .opt.selected{background:var(--ink)}
+  .opt.selected .lbl{color:var(--cream)}
+  .opt.selected .num{color:var(--cream);border-color:var(--stone)}
+
+  /* ---------- result ---------- */
+  .r-eyebrow{font-weight:600;letter-spacing:.28em;font-size:10px;text-transform:uppercase;color:var(--stone)}
+  .r-head{font-weight:300;font-size:clamp(1.7rem,6.6vw,2.3rem);letter-spacing:-.015em;line-height:1.2;margin-top:12px}
+  .pillar-card{margin-top:26px;padding:22px 20px;border:1px solid var(--line);display:flex;gap:16px;align-items:flex-start}
+  .pillar-card svg{width:26px;height:26px;stroke:var(--ink);flex:0 0 26px;margin-top:2px}
+  .pillar-card .k{font-weight:600;letter-spacing:.16em;font-size:9px;text-transform:uppercase;color:var(--stone)}
+  .pillar-card h3{font-weight:400;font-size:17px;margin-top:5px;letter-spacing:-.005em}
+  .pillar-card p{font-weight:400;font-size:13.5px;color:var(--ash);margin-top:8px;line-height:1.6}
+  .holding{margin-top:20px;font-weight:400;font-size:12.5px;color:var(--ash);line-height:1.7}
+  .holding b{color:var(--ink);font-weight:600}
+  .pitch{margin-top:30px;padding-top:24px;border-top:1px solid var(--line);font-weight:400;font-size:14px;color:var(--ash);line-height:1.7}
+  .cta{display:inline-flex;align-items:center;justify-content:center;width:100%;height:52px;margin-top:22px;
+    background:var(--ink);color:var(--cream);text-decoration:none;font-family:var(--font);
+    font-weight:600;letter-spacing:.16em;font-size:11.5px;text-transform:uppercase}
+  .r-foot{margin-top:34px;text-align:center;font-weight:600;letter-spacing:.22em;font-size:9px;text-transform:uppercase;color:var(--stone)}
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="wrap">
+    <header>
+      <div class="wm">Canvas.</div>
+      <div class="tag">Collective</div>
+      <div class="progress-track" id="progressTrack" style="display:none"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-label" id="progressLabel" style="display:none"></div>
+    </header>
+  </div>
+
+  <main>
+    <div class="wrap">
+
+      <section class="screen active" id="screen-gate">
+        <h1>Twelve questions. One read.</h1>
+        <p class="lede">A few details first, so we know where to send it.</p>
+
+        <form id="gateForm" novalidate>
+          <div class="field">
+            <label for="fName">First name</label>
+            <input type="text" id="fName" name="fName" autocomplete="given-name" required>
+          </div>
+          <div class="field">
+            <label for="fEmail">Email</label>
+            <input type="email" id="fEmail" name="fEmail" autocomplete="email" required>
+          </div>
+          <div class="field">
+            <label for="fMobile">Mobile</label>
+            <input type="tel" id="fMobile" name="fMobile" autocomplete="tel" required>
+          </div>
+
+          <div class="hp" aria-hidden="true">
+            <label for="fCompany">Leave this field empty</label>
+            <input type="text" id="fCompany" name="fCompany" tabindex="-1" autocomplete="off">
+          </div>
+
+          <div class="consent">
+            <input type="checkbox" id="fConsent" name="fConsent" required>
+            <label for="fConsent">I agree to be contacted about my results and a Canvas Collective plan, and understand my information is kept private.</label>
+          </div>
+
+          <button type="submit" class="btn" id="gateBtn" disabled>Begin</button>
+        </form>
+      </section>
+
+      <section class="screen" id="screen-quiz"></section>
+
+      <section class="screen" id="screen-result"></section>
+
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+
+  /* ======================================================
+     CONFIG · fill in before this goes live
+     ====================================================== */
+  var CONFIG = {
+    pathway: 'long-view', // internal routing key only, never rendered to the patient
+    webhookUrl: 'TBC',    // lead capture endpoint · ask Kaitlin
+    bookingUrl: 'TBC'     // results-and-plan consult booking link · ask Kaitlin
+  };
+
+  /* ======================================================
+     DATA
+     ====================================================== */
+  var PILLARS = [
+    { key:'skin', label:'Skin',
+      icon:'<path d="M16 4c5 4 9 9 9 15a9 9 0 1 1-18 0c0-6 4-11 9-15Z"/>',
+      starting:'Skin is where this starts. The plan opens with a proper read of what your skin is doing, before anything is booked.',
+      next:'Skin sits close behind, worth holding in the same plan.' },
+    { key:'hair', label:'Hair & Scalp',
+      icon:'<path d="M9 5c2 6-2 8 0 14M16 5c2 6-2 8 0 14M23 5c2 6-2 8 0 14"/>',
+      starting:'Hair and scalp lead the read. What shows up here often explains changes turning up elsewhere too.',
+      next:'Hair and scalp sit close behind, worth watching alongside the rest.' },
+    { key:'weight', label:'Weight & Metabolic',
+      icon:'<path d="M16 6v3M9 9h14l2 15a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L9 9Z"/><path d="M12 14a4 4 0 0 0 8 0"/>',
+      starting:'Weight and metabolic health lead the read. The number on the scale is rarely the whole story, the plan starts with what sits behind it.',
+      next:'Weight and metabolic health sit close behind, part of the same picture.' },
+    { key:'hormones', label:'Hormones',
+      icon:'<circle cx="12" cy="12" r="3.5"/><circle cx="21" cy="12" r="2"/><circle cx="16" cy="22" r="2.5"/><path d="M14.8 14.4 18.6 19M14.3 10.8l4.2-.4"/>',
+      starting:'Hormones lead the read. Skin, hair and weight often trace back here, so this is where the plan opens.',
+      next:'Hormones sit close behind, likely feeding into the rest.' },
+    { key:'aesthetics', label:'Medical Aesthetics',
+      icon:'<path d="M16 4 27 12l-4 16H9L5 12 16 4Z"/><path d="M16 4v24M5 12h22"/>',
+      starting:'Medical aesthetics lead the read. What you have noticed is considered first, alongside everything sitting underneath it.',
+      next:'Medical aesthetics sit close behind, considered once the rest is settled.' }
+  ];
+
+  var ANSWER_LABELS = ['Rarely', 'Sometimes', 'Often'];
+
+  var QUESTIONS = [
+    { id:1,  pillar:'skin',       text:'My skin looks tired even when I have slept well.' },
+    { id:2,  pillar:'skin',       text:'I notice fine lines, dullness or uneven tone when I look closely.' },
+    { id:3,  pillar:'skin',       text:'Breakouts, redness or sensitivity still show up, more than I would like at this stage.' },
+    { id:4,  pillar:'hair',       text:'I notice more hair in the shower drain or on my pillow than I used to.' },
+    { id:5,  pillar:'hair',       text:'My scalp feels tight, itchy or oily in a way that concerns me.' },
+    { id:6,  pillar:'weight',     text:'My weight moves in a direction I did not choose, even when my habits stay the same.' },
+    { id:7,  pillar:'weight',     text:'I feel tired through the afternoon in a way food and sleep do not fix.' },
+    { id:8,  pillar:'weight',     text:'Clothes fit differently around the middle than they did a few years ago.' },
+    { id:9,  pillar:'hormones',   text:'My cycle, sleep or mood have shifted in ways that feel new.' },
+    { id:10, pillar:'hormones',   text:'Hot flushes, night sweats or sudden temperature changes show up more than they used to.' },
+    { id:11, pillar:'aesthetics', text:'There are one or two things I would change about my face, if the change looked natural.' },
+    { id:12, pillar:'aesthetics', text:'I have thought about anti-wrinkle, filler or a similar treatment, without booking it.' }
+  ];
+
+  var INTENT_QUESTION = {
+    text: 'Once you have your read, what would help you most.',
+    options: [
+      { label:'A team who plans it, and tells me what is next.', level:'Core',  valueLed:false },
+      { label:'A menu I can choose from myself, at my own pace.', level:'Entry', valueLed:true },
+      { label:'I would like to see the read first, then decide.', level:'Entry', valueLed:false }
+    ]
+  };
+
+  var TOTAL_STEPS = QUESTIONS.length + 1; // + intent question
+
+  /* ======================================================
+     STATE
+     ====================================================== */
+  var lead = { fName:'', fEmail:'', fMobile:'', fConsent:false };
+  var answers = {};      // questionId -> 0/1/2
+  var intentChoice = null; // selected option object from INTENT_QUESTION
+  var step = 0;           // 0-indexed across QUESTIONS + intent
+
+  /* ======================================================
+     CAPTURE GATE
+     ====================================================== */
+  var gateForm = document.getElementById('gateForm');
+  var gateBtn = document.getElementById('gateBtn');
+  var gateInputs = ['fName','fEmail','fMobile'].map(function(id){ return document.getElementById(id); });
+  var consentInput = document.getElementById('fConsent');
+  var honeypot = document.getElementById('fCompany');
+
+  function gateValid(){
+    var mobileOk = /^[0-9+()\s-]{8,}$/.test(document.getElementById('fMobile').value.trim());
+    var emailOk = document.getElementById('fEmail').value.trim().length > 3 && document.getElementById('fEmail').value.indexOf('@') > -1;
+    var nameOk = document.getElementById('fName').value.trim().length > 0;
+    return nameOk && emailOk && mobileOk && consentInput.checked;
+  }
+  function refreshGateBtn(){ gateBtn.disabled = !gateValid(); }
+  gateInputs.forEach(function(el){ el.addEventListener('input', refreshGateBtn); });
+  consentInput.addEventListener('change', refreshGateBtn);
+
+  gateForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    if (!gateValid()) return;
+    if (honeypot.value.trim() !== '') { lead._spam = true; }
+    lead.fName = document.getElementById('fName').value.trim();
+    lead.fEmail = document.getElementById('fEmail').value.trim();
+    lead.fMobile = document.getElementById('fMobile').value.trim();
+    lead.fConsent = true;
+    goToScreen('quiz');
+    renderStep();
+  });
+
+  /* ======================================================
+     SCREEN SWITCHING
+     ====================================================== */
+  var screens = {
+    gate: document.getElementById('screen-gate'),
+    quiz: document.getElementById('screen-quiz'),
+    result: document.getElementById('screen-result')
+  };
+  var progressTrack = document.getElementById('progressTrack');
+  var progressFill = document.getElementById('progressFill');
+  var progressLabel = document.getElementById('progressLabel');
+
+  function goToScreen(name){
+    Object.keys(screens).forEach(function(k){ screens[k].classList.remove('active'); });
+    screens[name].classList.add('active');
+    document.body.dataset.screen = name;
+    if (name === 'quiz') {
+      progressTrack.style.display = '';
+      progressLabel.style.display = '';
+    } else {
+      progressTrack.style.display = 'none';
+      progressLabel.style.display = 'none';
+    }
+  }
+
+  /* ======================================================
+     QUESTION RENDERING
+     ====================================================== */
+  function renderStep(){
+    var container = screens.quiz;
+    container.innerHTML = '';
+
+    var backBtn = document.createElement('button');
+    backBtn.type = 'button';
+    backBtn.className = 'back';
+    backBtn.textContent = '← Back';
+    backBtn.style.visibility = step === 0 ? 'hidden' : 'visible';
+    backBtn.addEventListener('click', function(){
+      if (step === 0) { goToScreen('gate'); return; }
+      step -= 1;
+      renderStep();
+    });
+    container.appendChild(backBtn);
+
+    var qText = document.createElement('div');
+    qText.className = 'q-text';
+    var options = document.createElement('div');
+    options.className = 'options';
+
+    if (step < QUESTIONS.length) {
+      var q = QUESTIONS[step];
+      qText.textContent = q.text;
+      progressLabel.textContent = 'Question ' + (step + 1) + ' of ' + QUESTIONS.length;
+      progressFill.style.width = (((step) / QUESTIONS.length) * 100) + '%';
+
+      ANSWER_LABELS.forEach(function(label, i){
+        var btn = buildOption(i, label, answers[q.id] === i);
+        btn.addEventListener('click', function(){ selectAnswer(q.id, i); });
+        options.appendChild(btn);
+      });
+    } else {
+      qText.textContent = INTENT_QUESTION.text;
+      progressLabel.textContent = 'Last question';
+      progressFill.style.width = '100%';
+
+      INTENT_QUESTION.options.forEach(function(opt, i){
+        var btn = buildOption(i, opt.label, intentChoice === opt);
+        btn.addEventListener('click', function(){ selectIntent(opt); });
+        options.appendChild(btn);
+      });
+    }
+
+    container.appendChild(qText);
+    container.appendChild(options);
+  }
+
+  function buildOption(index, label, isSelected){
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'opt' + (isSelected ? ' selected' : '');
+    var num = document.createElement('span');
+    num.className = 'num';
+    num.textContent = String(index + 1);
+    var lbl = document.createElement('span');
+    lbl.className = 'lbl';
+    lbl.textContent = label;
+    btn.appendChild(num);
+    btn.appendChild(lbl);
+    return btn;
+  }
+
+  function selectAnswer(questionId, value){
+    answers[questionId] = value;
+    if (step < QUESTIONS.length - 1) {
+      step += 1;
+      renderStep();
+    } else {
+      step += 1; // move into the intent question
+      renderStep();
+    }
+  }
+
+  function selectIntent(opt){
+    intentChoice = opt;
+    finish();
+  }
+
+  /* ======================================================
+     KEYBOARD SUPPORT · 1 / 2 / 3 select the visible options
+     ====================================================== */
+  document.addEventListener('keydown', function(e){
+    if (document.body.dataset.screen !== 'quiz') return;
+    var map = { '1':0, '2':1, '3':2 };
+    if (!(e.key in map)) return;
+    var idx = map[e.key];
+    var optButtons = screens.quiz.querySelectorAll('.opt');
+    if (optButtons[idx]) optButtons[idx].click();
+  });
+
+  /* ======================================================
+     SCORING
+     ====================================================== */
+  function computeResults(){
+    var pillarMax = {}, pillarRaw = {};
+    PILLARS.forEach(function(p){ pillarMax[p.key] = 0; pillarRaw[p.key] = 0; });
+    QUESTIONS.forEach(function(q){
+      pillarMax[q.pillar] += 2;
+      pillarRaw[q.pillar] += (answers[q.id] || 0);
+    });
+    var shares = PILLARS.map(function(p){
+      return {
+        key: p.key,
+        label: p.label,
+        raw: pillarRaw[p.key],
+        max: pillarMax[p.key],
+        share: pillarMax[p.key] ? pillarRaw[p.key] / pillarMax[p.key] : 0
+      };
+    });
+    var sorted = shares.slice().sort(function(a,b){ return b.share - a.share; });
+    var holding = shares.filter(function(s){ return s.raw === 0; }).map(function(s){ return s.key; });
+
+    return {
+      pillarScores: shares.reduce(function(acc,s){ acc[s.key] = Math.round(s.share * 100) / 100; return acc; }, {}),
+      startingPillar: sorted[0].key,
+      nextPillar: sorted[1].key,
+      holding: holding
+    };
+  }
+
+  /* ======================================================
+     RESULT + LEAD SEND
+     ====================================================== */
+  function finish(){
+    var results = computeResults();
+    renderResult(results);
+    sendLead(results);
+    goToScreen('result');
+  }
+
+  function pillarByKey(key){
+    for (var i = 0; i < PILLARS.length; i++) if (PILLARS[i].key === key) return PILLARS[i];
+    return null;
+  }
+
+  function renderResult(results){
+    var container = screens.result;
+    var starting = pillarByKey(results.startingPillar);
+    var next = pillarByKey(results.nextPillar);
+
+    var html = '';
+    html += '<div class="r-eyebrow">Your read</div>';
+    html += '<h1 class="r-head">' + escapeHtml(lead.fName) + ', here is your Canvas Collective read.</h1>';
+
+    html += pillarCardHtml('Starts here', starting);
+    html += pillarCardHtml('Next', next);
+
+    if (results.holding.length) {
+      var holdingLabels = results.holding.map(function(k){ return pillarByKey(k).label; });
+      html += '<p class="holding"><b>Holding.</b> ' + holdingLabels.join(', ') + ' read as steady, nothing to worry about right now.</p>';
+    }
+
+    html += '<p class="pitch">' + pitchCopy(intentChoice) + '</p>';
+
+    var bookingHref = CONFIG.bookingUrl || 'TBC';
+    html += '<a class="cta" href="' + escapeHtml(bookingHref) + '">Book your results-and-plan consult</a>';
+    html += '<div class="r-foot">Canvas Collective</div>';
+
+    container.innerHTML = html;
+  }
+
+  function pillarCardHtml(kicker, pillar){
+    return '<div class="pillar-card">' +
+      '<svg viewBox="0 0 32 32" fill="none" stroke-width="1.3">' + pillar.icon + '</svg>' +
+      '<div><div class="k">' + kicker + '</div>' +
+      '<h3>' + escapeHtml(pillar.label) + '</h3>' +
+      '<p>' + escapeHtml(pillarCopy(kicker, pillar)) + '</p></div></div>';
+  }
+
+  function pillarCopy(kicker, pillar){
+    return kicker === 'Starts here' ? pillar.starting : pillar.next;
+  }
+
+  function pitchCopy(intent){
+    if (intent && intent.valueLed) {
+      return 'Canvas Collective gives you the plan, then you choose what you book and when. Everything mapped, nothing chased.';
+    }
+    return 'Canvas Collective holds this for you. One team, one plan, moved forward for you between visits.';
+  }
+
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  function sendLead(results){
+    var payload = {
+      firstName: lead.fName,
+      email: lead.fEmail,
+      mobile: lead.fMobile,
+      consent: lead.fConsent,
+      pathway: CONFIG.pathway, // internal only, never shown to the patient
+      pillarScores: results.pillarScores,
+      startingPillar: results.startingPillar,
+      nextPillar: results.nextPillar,
+      holding: results.holding,
+      intent: intentChoice ? intentChoice.label : null,
+      suggestedLevel: intentChoice ? intentChoice.level : null,
+      valueLed: intentChoice ? intentChoice.valueLed : null,
+      timestamp: new Date().toISOString()
+    };
+
+    if (lead._spam) {
+      console.warn('sendLead: honeypot triggered, lead not sent', payload);
+      return;
+    }
+    if (!CONFIG.webhookUrl || CONFIG.webhookUrl === 'TBC') {
+      console.warn('sendLead: webhook URL not yet configured (TBC). Payload held, not sent:', payload);
+      return;
+    }
+    fetch(CONFIG.webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(function(err){ console.error('sendLead failed', err); });
+  }
+
+})();
+</script>
+
+</body>
+</html>
