@@ -1,5 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /hub/
 
 Sitemap: https://www.beckslandscaping.com.au/sitemap.xml
-Disallow: /hub/
