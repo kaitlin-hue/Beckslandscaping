@@ -403,6 +403,24 @@ footer{padding:60px 0 40px;}
 .design-fine{margin-top:22px;font-size:11.5px;color:rgba(255,255,255,.45);}
 @media(max-width:880px){.design-grid{grid-template-columns:1fr;gap:36px;}.design-strip{grid-template-columns:1fr 1fr;}.design-strip figure:first-child{grid-column:1/-1;}.design-strip figure:first-child img{max-height:none;aspect-ratio:1240/1167;}}
 @media(max-width:700px){.design-card{padding:44px 20px;border-radius:20px;}.design-btns{flex-direction:column;align-items:stretch;}}
+.built{margin-top:64px;padding-top:48px;border-top:1px solid rgba(255,255,255,.14);}
+.built-title{font-size:clamp(24px,3vw,36px);font-weight:700;letter-spacing:-.025em;margin-top:16px;}
+.built-title .mut{color:#b0ab99;}
+.built-head p{margin-top:12px;max-width:52ch;font-size:15px;line-height:1.6;color:rgba(255,255,255,.72);}
+.built-three{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:28px;}
+.built-three figure,.built-row figure{margin:0;}
+.built-three img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:12px;background:rgba(255,255,255,.06);}
+.built-three figcaption{margin-top:10px;font-size:12.5px;color:rgba(255,255,255,.6);}
+.built-three figcaption b{display:block;color:#fff;font-size:14px;font-weight:600;margin-bottom:2px;}
+.built-tabs{display:flex;gap:8px;margin:32px 0 16px;}
+.built-tab{background:transparent;border:1px solid rgba(255,255,255,.28);color:#fff;border-radius:40px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+.built-tab.active{background:#fff;color:var(--ink);border-color:#fff;}
+.built-row{display:none;grid-template-columns:repeat(4,1fr);gap:14px;}
+.built-row.active{display:grid;}
+.built-row img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:12px;background:rgba(255,255,255,.06);}
+.built-row figcaption{margin-top:8px;font-size:12px;color:rgba(255,255,255,.6);}
+@media(max-width:880px){.built-three{grid-template-columns:1fr 1fr 1fr;gap:8px;}.built-row{grid-template-columns:1fr 1fr;}}
+@media(max-width:560px){.built-three{grid-template-columns:1fr;}.built-three img{aspect-ratio:4/3;}}
 </style>
 <script type="application/ld+json">
 {
@@ -781,7 +799,36 @@ footer{padding:60px 0 40px;}
       <figure><img loading="lazy" src="https://nwpperddaojaafsyuqyx.supabase.co/storage/v1/object/public/site/burwood/gazebo.webp" alt="Bali gazebo terrace detail" /><figcaption>Gazebo terrace</figcaption></figure>
       <figure><img loading="lazy" src="https://nwpperddaojaafsyuqyx.supabase.co/storage/v1/object/public/site/burwood/seat.webp" alt="Built-in timber corner seat detail" /><figcaption>Built-in timber seat</figcaption></figure>
     </div>
-    <p class="design-fine">Concept renders are for visual purposes and are confirmed at survey and documentation.</p>
+
+    <div class="built reveal">
+      <div class="built-head">
+        <span class="eyebrow light"><span class="dot"></span>Then we built it</span>
+        <h3 class="built-title">From render to <span class="mut">real garden.</span></h3>
+        <p>Burwood Street went from tired lawn to finished garden in one build, with the render as the reference the whole way.</p>
+      </div>
+      <div class="built-three">
+        <figure><img loading="lazy" src="https://nwpperddaojaafsyuqyx.supabase.co/storage/v1/object/public/site/burwood/before.webp" alt="Burwood Street rear garden before the design" style="object-position:50% 30%;" /><figcaption><b>Before</b>The yard as it was</figcaption></figure>
+        <figure><img loading="lazy" src="https://nwpperddaojaafsyuqyx.supabase.co/storage/v1/object/public/site/burwood/render.webp" alt="Burwood Street design render" /><figcaption><b>The design</b>What the client signed off</figcaption></figure>
+        <figure><img loading="lazy" src="img/burwood/built-pool.webp" alt="Finished Burwood Street garden with pool, gazebo and new boundary planting" /><figcaption><b>Built</b>Finished by Beck's crew</figcaption></figure>
+      </div>
+      <div class="built-tabs" role="tablist">
+        <button class="built-tab active" data-set="during" type="button">On site</button>
+        <button class="built-tab" data-set="after" type="button">Finished</button>
+      </div>
+      <div class="built-row active" data-set="during">
+        <figure><img loading="lazy" src="img/burwood/before-lawn.webp" alt="Old sandstone wall and lawn before works" /><figcaption>Day one</figcaption></figure>
+        <figure><img loading="lazy" src="img/burwood/during-demo.webp" alt="Old shed and fencing cleared during demolition" /><figcaption>Clearing the old shed and fence</figcaption></figure>
+        <figure><img loading="lazy" src="img/burwood/during-dig.webp" alt="Excavation and soil piles during the build" /><figcaption>Excavation</figcaption></figure>
+        <figure><img loading="lazy" src="img/burwood/during-turf.webp" alt="Crew laying turf beside the pool" /><figcaption>Turf going down</figcaption></figure>
+      </div>
+      <div class="built-row" data-set="after">
+        <figure><img loading="lazy" src="img/burwood/built-wall.webp" alt="Limestone retaining wall and planter with new turf" /><figcaption>Limestone wall and planter</figcaption></figure>
+        <figure><img loading="lazy" src="img/burwood/built-seat.webp" alt="Corner timber seat around a fire pit" /><figcaption>Corner seat and fire pit</figcaption></figure>
+        <figure><img loading="lazy" src="img/burwood/built-firepit.webp" alt="Fire pit, timber bench and raised planter looking back to the pool" /><figcaption>Looking back to the pool</figcaption></figure>
+        <figure><img loading="lazy" src="img/burwood/built-lawn.webp" alt="Finished lawn along the new white boundary fence" /><figcaption>Lawn and boundary planting</figcaption></figure>
+      </div>
+    </div>
+    <p class="design-fine">Concept renders are for visual purposes and are confirmed at survey and documentation. All Burwood Street photos are from the real job.</p>
   </div>
   </div>
 </section>
@@ -1165,6 +1212,8 @@ if(galItems.length&&lightbox&&lightboxImg){
     if(e.key==='ArrowRight')step(1);
   });
 }
+
+document.querySelectorAll('.built-tab').forEach(t=>t.addEventListener('click',()=>{const s=t.dataset.set;document.querySelectorAll('.built-tab').forEach(x=>x.classList.toggle('active',x===t));document.querySelectorAll('.built-row').forEach(r=>r.classList.toggle('active',r.dataset.set===s));}));
 </script>
 
 <a href="https://wa.me/61438456320?text=Hi%20Beck%27s%20Landscaping%2C%20I%27d%20like%20to%20chat%20about%20a%20project" target="_blank" rel="noopener" class="wa-bubble" aria-label="Chat with us on WhatsApp">
