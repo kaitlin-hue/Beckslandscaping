@@ -2,3 +2,4 @@ User-agent: *
 Allow: /
 
 Sitemap: https://www.beckslandscaping.com.au/sitemap.xml
+Disallow: /hub/
