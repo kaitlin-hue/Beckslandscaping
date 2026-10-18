@@ -374,6 +374,33 @@ footer{padding:60px 0 40px;}
 .faq-item.open .plus{transform:rotate(45deg);}
 .faq-a{max-height:0;overflow:hidden;transition:max-height .3s ease;}
 .faq-a p{font-size:14.5px;line-height:1.65;color:var(--mut);padding-bottom:22px;max-width:62ch;}
+.design-card{background:var(--green-2);border-radius:24px;padding:64px 48px;color:#fff;}
+.design-card .statement{color:#fff;max-width:18ch;}
+.design-lede{margin-top:18px;max-width:52ch;font-size:16px;line-height:1.6;color:rgba(255,255,255,.75);}
+.design-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:48px;margin-top:44px;align-items:start;}
+.design-slider{aspect-ratio:1448/1086;max-width:none;}
+.design-cap{color:rgba(255,255,255,.6);}
+.design-note{margin-top:16px;font-size:14px;line-height:1.6;color:rgba(255,255,255,.72);}
+.design-note b{color:#fff;font-weight:600;}
+.design-list h3{font-size:19px;font-weight:600;letter-spacing:-.02em;margin-bottom:18px;}
+.design-list ul{list-style:none;display:flex;flex-direction:column;gap:16px;}
+.design-list li{display:flex;gap:14px;align-items:flex-start;}
+.design-list .ric{flex:none;width:28px;height:28px;border-radius:50%;border:1px solid rgba(255,255,255,.3);display:grid;place-items:center;font-size:12px;font-weight:600;}
+.design-list b{display:block;font-size:15px;font-weight:600;margin-bottom:3px;}
+.design-list p{font-size:13.5px;line-height:1.55;color:rgba(255,255,255,.68);}
+.design-price{display:flex;align-items:center;gap:18px;margin:28px 0 20px;padding:18px 20px;border:1px solid rgba(255,255,255,.18);border-radius:14px;}
+.design-price .dp-num{font-family:Georgia,"Times New Roman",serif;font-size:38px;line-height:1;}
+.design-price .dp-gst{font-size:13px;margin-left:6px;color:rgba(255,255,255,.7);}
+.design-price p{font-size:13.5px;line-height:1.5;color:rgba(255,255,255,.75);}
+.design-btns{justify-content:flex-start;}
+.design-strip{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:14px;margin-top:48px;}
+.design-strip figure{margin:0;}
+.design-strip img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px;background:rgba(255,255,255,.06);}
+.design-strip figure:first-child img{aspect-ratio:auto;height:100%;max-height:230px;}
+.design-strip figcaption{font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.6);margin-top:8px;}
+.design-fine{margin-top:22px;font-size:11.5px;color:rgba(255,255,255,.45);}
+@media(max-width:880px){.design-grid{grid-template-columns:1fr;gap:36px;}.design-strip{grid-template-columns:1fr 1fr;}.design-strip figure:first-child{grid-column:1/-1;}.design-strip figure:first-child img{max-height:none;aspect-ratio:1240/1167;}}
+@media(max-width:700px){.design-card{padding:44px 20px;border-radius:20px;}.design-btns{flex-direction:column;align-items:stretch;}}
 </style>
 <script type="application/ld+json">
 {
@@ -460,6 +487,7 @@ footer{padding:60px 0 40px;}
       <a href="#services">What we do</a>
       <a href="#work">Our work</a>
       <a href="#gallery">Gallery</a>
+      <a href="#design">Design</a>
       <a href="#how">How we work</a>
       <a href="#team">The team</a>
       <a href="#cta" class="nav-links-cta">Book a site visit</a>
@@ -701,6 +729,61 @@ footer{padding:60px 0 40px;}
   </div>
 </section>
 
+<!-- LANDSCAPE DESIGN -->
+<section id="design" style="padding-top:0;">
+  <div class="wrap">
+  <div class="design-card">
+    <div class="design-head reveal">
+      <span class="eyebrow light"><span class="dot"></span>Landscape design</span>
+      <h2 class="statement" style="margin-top:20px;">See your garden <span class="mut">before we build it.</span></h2>
+      <p class="design-lede">A full landscape concept for your property, drawn to scale and rendered from your own view. $990 + GST, credited back in full when we build it.</p>
+    </div>
+
+    <div class="design-grid">
+      <div class="design-proof reveal">
+        <span class="ba-cap design-cap">Today and the design &middot; drag to compare</span>
+        <div class="ba-slider design-slider">
+          <div class="ba-img ba-after"><img loading="lazy" src="https://nwpperddaojaafsyuqyx.supabase.co/storage/v1/object/public/site/burwood/render.webp" alt="Dusk concept render of the designed rear garden at Burwood Street, Nedlands" /></div>
+          <div class="ba-img ba-before"><img loading="lazy" src="https://nwpperddaojaafsyuqyx.supabase.co/storage/v1/object/public/site/burwood/before.webp" alt="The same rear garden at Burwood Street, Nedlands, before the design" style="object-position:50% 30%;" /></div>
+          <span class="ba-tag ba-tag-before">TODAY</span>
+          <span class="ba-tag ba-tag-after">DESIGNED</span>
+          <div class="ba-handle"><div class="ba-grip">&#8596;</div></div>
+        </div>
+        <p class="design-note"><b>Burwood Street, Nedlands.</b> A pool, a gazebo and a tired yard, resolved into one garden with a limestone wall and planter, a timber corner seat, waterwise planting and warm lighting.</p>
+      </div>
+
+      <div class="design-list reveal">
+        <h3>What your design includes</h3>
+        <ul>
+          <li><span class="ric">1</span><div><b>Your view, redesigned</b><p>A photo of your garden today beside the render of the finished design.</p></div></li>
+          <li><span class="ric">2</span><div><b>The whole garden, to scale</b><p>One aerial render with every zone, wall and terrace measured out.</p></div></li>
+          <li><span class="ric">3</span><div><b>The built elements</b><p>Walls, planters, terraces and seating, detailed so you know exactly what gets built.</p></div></li>
+          <li><span class="ric">4</span><div><b>Lighting after dark</b><p>Where the uplights, washes and feature lights go.</p></div></li>
+          <li><span class="ric">5</span><div><b>Planting and materials</b><p>A waterwise planting palette proven in Perth sand, and the materials that suit your home.</p></div></li>
+          <li><span class="ric">6</span><div><b>A clear path to build</b><p>Sign off the design and it becomes the reference for your costed plan and the build.</p></div></li>
+        </ul>
+        <div class="design-price">
+          <div><span class="dp-num">$990</span><span class="dp-gst">+ GST</span></div>
+          <p>Credited back in full when Beck's builds your garden.</p>
+        </div>
+        <div class="btn-row design-btns">
+          <a href="https://form.jotform.com/260408375301046" target="_blank" rel="noopener" class="btn primary" id="bookDesign">Book your design <span class="arr"><svg class="ico-arr" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="8 7 17 7 17 16"/></svg></span></a>
+          <a href="https://beckslandscapingburwood.tiiny.site/" target="_blank" rel="noopener" class="btn ghost">See the full Burwood design</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="design-strip reveal">
+      <figure><img loading="lazy" src="https://nwpperddaojaafsyuqyx.supabase.co/storage/v1/object/public/site/burwood/aerial.webp" alt="Annotated aerial render of the Burwood Street garden, to scale" /><figcaption>The whole garden, to scale</figcaption></figure>
+      <figure><img loading="lazy" src="https://nwpperddaojaafsyuqyx.supabase.co/storage/v1/object/public/site/burwood/wall.webp" alt="Limestone retaining wall and planter detail" /><figcaption>Limestone wall and planter</figcaption></figure>
+      <figure><img loading="lazy" src="https://nwpperddaojaafsyuqyx.supabase.co/storage/v1/object/public/site/burwood/gazebo.webp" alt="Bali gazebo terrace detail" /><figcaption>Gazebo terrace</figcaption></figure>
+      <figure><img loading="lazy" src="https://nwpperddaojaafsyuqyx.supabase.co/storage/v1/object/public/site/burwood/seat.webp" alt="Built-in timber corner seat detail" /><figcaption>Built-in timber seat</figcaption></figure>
+    </div>
+    <p class="design-fine">Concept renders are for visual purposes and are confirmed at survey and documentation.</p>
+  </div>
+  </div>
+</section>
+
 <!-- NUMBERS -->
 <section id="numbers" style="padding-top:0;">
   <div class="wrap">
@@ -737,7 +820,7 @@ footer{padding:60px 0 40px;}
     </div>
     <div class="proc-grid reveal">
       <div class="pcard"><span class="step">STEP 01</span><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2C7.6 2 4 5.6 4 10c0 5.5 7 12 8 12s8-6.5 8-12c0-4.4-3.6-8-8-8z" fill="#3d5457"/><circle cx="12" cy="10" r="3.2" fill="#fff"/></svg></div><h3>Site visit</h3><p>Start with our project intake form, then we walk the property together and talk through your vision.</p></div>
-      <div class="pcard"><span class="step">STEP 02</span><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="19" rx="2" fill="#3d5457"/><rect x="8" y="1.2" width="8" height="4" rx="1.4" fill="#2c3d40"/><rect x="7" y="9.5" width="10" height="2.2" rx="1.1" fill="#fff"/><rect x="7" y="13.3" width="10" height="2.2" rx="1.1" fill="#fff"/><rect x="7" y="17.1" width="6" height="2.2" rx="1.1" fill="#fff"/></svg></div><h3>The plan</h3><p>A costed, scoped plan before anything is dug up, with a full landscape design available if you'd like one.</p><a href="https://form.jotform.com/260408375301046" target="_blank" rel="noopener" class="price-tag">Design service &middot; $990 + GST, credited back if you build <span class="arr"><svg class="ico-arr" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="8 7 17 7 17 16"/></svg></span></a></div>
+      <div class="pcard"><span class="step">STEP 02</span><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="19" rx="2" fill="#3d5457"/><rect x="8" y="1.2" width="8" height="4" rx="1.4" fill="#2c3d40"/><rect x="7" y="9.5" width="10" height="2.2" rx="1.1" fill="#fff"/><rect x="7" y="13.3" width="10" height="2.2" rx="1.1" fill="#fff"/><rect x="7" y="17.1" width="6" height="2.2" rx="1.1" fill="#fff"/></svg></div><h3>The plan</h3><p>A costed, scoped plan before anything is dug up, with a full landscape design available if you'd like one.</p><a href="#design" class="price-tag">Design service &middot; $990 + GST, credited back if you build <span class="arr"><svg class="ico-arr" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="8 7 17 7 17 16"/></svg></span></a></div>
       <div class="pcard"><span class="step">STEP 03</span><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M21.4 6.1a4.6 4.6 0 0 1-6 5.9L7.8 19.6a2.1 2.1 0 1 1-3-3l7.6-7.6a4.6 4.6 0 0 1 5.9-6l-2.6 2.6a1 1 0 0 0 0 1.5l1.5 1.5a1 1 0 0 0 1.5 0l2.7-2.5z" fill="#3d5457"/></svg></div><h3>The build</h3><p>Every Beck's Landscaping crew builds to the same standard, start to finish.</p></div>
       <div class="pcard"><span class="step">STEP 04</span><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M20 4C10 4 4 10 4 18c0 1.1.9 2 2 2 8 0 14-6 14-16z" fill="#3d5457"/><path d="M6.5 19.5L18 8" stroke="#2c3d40" stroke-width="1.6" stroke-linecap="round"/></svg></div><h3>Handover</h3><p>A finished space, ready for real life.</p></div>
     </div>
@@ -893,7 +976,7 @@ footer{padding:60px 0 40px;}
           <p>Design, construction and planting, since 2000.</p>
         </div>
       </div>
-      <div class="foot-col"><h5>Site</h5><a href="#services">What we do</a><a href="#work">Our work</a><a href="#gallery">Gallery</a><a href="#how">How we work</a><a href="#team">The team</a><a href="#faq">FAQ</a><a href="https://form.jotform.com/260408375301046" target="_blank" rel="noopener">Start your project</a><a href="#cta">Book a site visit</a></div>
+      <div class="foot-col"><h5>Site</h5><a href="#services">What we do</a><a href="#work">Our work</a><a href="#gallery">Gallery</a><a href="#design">Landscape design</a><a href="#how">How we work</a><a href="#team">The team</a><a href="#faq">FAQ</a><a href="https://form.jotform.com/260408375301046" target="_blank" rel="noopener">Start your project</a><a href="#cta">Book a site visit</a></div>
       <div class="foot-col">
         <h5>Contact</h5>
         <div class="contact-row"><span class="i">✉</span><a href="mailto:contact@beckslandscaping.com.au">contact@beckslandscaping.com.au</a></div>
