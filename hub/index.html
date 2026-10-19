@@ -83,6 +83,9 @@ td input{padding:6px 8px;font-size:13px}
 .g-lane{position:relative;height:46px;border-bottom:1px solid #f1ede3;flex:none}
 .g-bar{position:absolute;top:10px;height:26px;border-radius:6px;color:#fff;font-size:11px;font-weight:600;padding:5px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
 .g-bar.pencil{background:repeating-linear-gradient(45deg,#c9a96e 0 6px,#d6bb87 6px 12px);color:#3b2d12}
+.g-bar.drag,.g-promise.drag{cursor:grab;touch-action:pan-y;user-select:none}.g-bar.lift,.g-promise.lift{cursor:grabbing;box-shadow:0 6px 16px rgba(21,20,15,.25);z-index:3}
+.g-promise{position:absolute;top:6px;bottom:6px;border-radius:7px;background:rgba(201,169,110,.18);border:1.5px dashed var(--sand);font-size:11px;font-weight:600;color:#6b5527;padding:7px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.g-promise.late{background:rgba(180,67,47,.10);border-color:var(--bad);color:var(--bad)}
 .g-bar.booked{background:var(--green)}.g-bar.onsite{background:var(--green-2)}.g-bar.done{background:#8d9a97}
 .g-cap{height:34px}
 .g-cap i{position:absolute;bottom:4px;width:calc(100% - 4px);border-radius:3px 3px 0 0}
@@ -152,7 +155,7 @@ td input{padding:6px 8px;font-size:13px}
 .stg .c{width:34px;text-align:right;font-family:Georgia,serif;font-size:15px;flex:none}
 
 /* ---------- desktop: sidebar layout ---------- */
-nav.tabs .nav-brand,nav.tabs .nav-foot{display:none}
+nav.tabs .nav-brand,nav.tabs .nav-foot,nav.tabs button.desk{display:none}
 @media(min-width:1000px){
   header.top{display:none}
   .app{max-width:none;margin:0 0 0 248px;padding:12px clamp(24px,4vw,56px) 64px}
@@ -165,6 +168,7 @@ nav.tabs .nav-brand,nav.tabs .nav-foot{display:none}
   nav.tabs .add{order:90;margin-top:auto;width:100%;min-width:0;height:48px;border-radius:12px;background:var(--sand);color:#1d2a2c;box-shadow:none;justify-content:center;font-weight:700}
   nav.tabs .add:hover{background:#d6bb87;color:#1d2a2c}
   nav.tabs .add span{display:inline}
+  nav.tabs button.desk{display:flex}
   nav.tabs .nav-brand{display:flex;order:-1;padding:0 10px 22px}
   nav.tabs .nav-brand b{color:#fff;font-size:18px}nav.tabs .nav-brand span{color:var(--sand);font-size:11px;letter-spacing:.28em}
   nav.tabs .nav-foot{display:flex;order:99;min-height:40px;font-size:13px;font-weight:500;color:#9fb0ae;margin-top:8px}
@@ -184,7 +188,7 @@ const sb = supabase.createClient("https://nwpperddaojaafsyuqyx.supabase.co","sb_
 const STAGES=['Lead','Design','Quoted','Accepted','Deposit in','Materials ordered','On site','Complete','Invoiced','Paid'];
 const BOOKED=['Accepted','Deposit in','Materials ordered','On site'];
 const PENCIL=['Lead','Design','Quoted'];
-const S={user:null,profile:null,view:'jobs',jobs:[],tasks:[],rates:[],settings:{},crew:[],crewDays:[],costs:[],camps:[],draft:null,jobId:null};
+const S={user:null,profile:null,view:'jobs',jobs:[],tasks:[],rates:[],settings:{},crew:[],crewDays:[],costs:[],camps:[],cps:[],leads:[],finSet:null,finUntil:0,dbReady:false,draft:null,jobId:null};
 const $=(s,el=document)=>el.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=(n,dp=0)=>n==null||isNaN(n)?'–':(n<0?'-':'')+'$'+Math.abs(+n).toLocaleString('en-AU',{minimumFractionDigits:dp,maximumFractionDigits:dp});
@@ -230,11 +234,26 @@ function nextFreeStart(excludeId,crewNeed){crewNeed=crewNeed||S.settings.default
 
 /* ---------- data ---------- */
 async function loadAll(){
-  const q={jobs:sb.from('jobs').select('*, clients(name,phone,email)').order('created_at',{ascending:false}),tasks:sb.from('job_tasks').select('*').order('seq'),settings:sb.from('settings').select('*').single(),crew:sb.from('crew').select('*').order('name')};
-  if(isStaff()){q.rates=sb.from('rates').select('*').order('task_type');q.crewDays=sb.from('crew_days').select('*').order('work_date');q.costs=sb.from('job_costs').select('*')}
-  if(isStaff()||isMkt())q.camps=sb.from('campaigns').select('*').order('week_start');
+  const q={settings:sb.from('settings').select('*').single(),crew:sb.from('crew').select('*').order('name')};
+  if(isStaff()){
+    q.jobs=sb.from('jobs').select('*, clients(name,phone,email)').order('created_at',{ascending:false});
+    q.tasks=sb.from('job_tasks').select('*').order('seq');
+    q.rates=sb.from('rates').select('*').order('task_type');q.crewDays=sb.from('crew_days').select('*').order('work_date');q.costs=sb.from('job_costs').select('*');
+    q.cps=sb.from('checkpoints').select('job_id,stage,done_at').order('done_at');
+    q.finSet=sb.rpc('finance_password_set');
+  }else{
+    // crew and marketing: board data with no money. Falls back to the tables until the database update has run.
+    q.jobs=sb.rpc('board_jobs');q.tasks=sb.rpc('board_tasks');
+  }
+  if(isStaff()||isMkt()){q.camps=sb.from('campaigns').select('*').order('week_start');q.leads=sb.rpc('marketing_leads')}
   const keys=Object.keys(q),res=await Promise.all(Object.values(q));
-  keys.forEach((k,i)=>{S[k]=res[i].data||(k==='settings'?{}:[])});
+  for(let i=0;i<keys.length;i++){const k=keys[i],r=res[i];
+    if(r.error&&(k==='jobs'||k==='tasks')&&!isStaff()){const f=k==='jobs'?await sb.from('jobs').select('id,stage,suburb,title,start_date,end_date,crew_size,created_at').order('created_at',{ascending:false}):await sb.from('job_tasks').select('id,job_id,seq,task_type,est_hours,crew_size,start_date,end_date').order('seq');S[k]=f.data||[];continue}
+    if(k==='finSet'){S.finSet=r.error?null:!!r.data;continue}
+    if(k==='leads'&&r.error){S.leads=null;continue}
+    S[k]=r.data||(k==='settings'?{}:[]);
+  }
+  S.dbReady=isStaff()?S.finSet!==null:true;
 }
 const tasksFor=id=>S.tasks.filter(t=>t.job_id===id).sort((a,b)=>a.seq-b.seq);
 const daysFor=id=>S.crewDays.filter(d=>d.job_id===id);
@@ -253,10 +272,68 @@ function numbersFor(j){
   const lostDays=actualDays?Math.max(0,actualDays-varDays-(qDays||0)):0;
   const lostDollars=lostDays*DAY_RATE();
   const mats=costsFor(j.id).reduce((a,c)=>a+(+c.amount||0),0);
-  return {j,quoteEx,qLabour,qDays,actualDays,varDays,actualCharge,actualCost,lostDays,lostDollars,mats,
+  // Job profit: what the client pays ex GST, minus materials, minus what the crew cost to pay.
+  const revenueEx=j.invoiced_total?j.invoiced_total/1.1:quoteEx;
+  const taskMats=ts.reduce((a,t)=>a+(+t.material_cost||0),0);
+  const matsUsed=mats||(j.quoted_materials!=null?+j.quoted_materials:taskMats)||0;
+  const matsSource=mats?'supplier costs':j.quoted_materials!=null?'materials in the quote':taskMats?'task materials':'no materials';
+  let labourCost=0,costKnown=cd.length>0;
+  for(const d of cd){if(d.cost!=null&&d.cost!==''){labourCost+=+d.cost;continue}
+    const c=S.crew.find(x=>x.id===d.crew_id);if(c&&c.cost_per_day!=null&&c.cost_per_day!==''){labourCost+=+c.cost_per_day*(+d.hours||0)/hpd}else costKnown=false}
+  const profit=costKnown&&revenueEx?revenueEx-matsUsed-labourCost:null;
+  return {j,quoteEx,qLabour,qDays,actualDays,varDays,actualCharge,actualCost,lostDays,lostDollars,mats,revenueEx,matsUsed,matsSource,labourCost,profit,margin:profit!=null&&revenueEx?profit/revenueEx:null,
     perDay:actualDays&&quoteEx?quoteEx/actualDays:null,overrun:qDays&&actualDays?(actualDays-varDays)/qDays-1:null};
 }
 function jobNumbers(){return S.jobs.map(numbersFor)}
+
+/* ---------- timing: replies, quotes, promised start windows ---------- */
+const OPEN=['Lead','Design','Quoted','Accepted','Deposit in','Materials ordered','On site'];
+const daysBetween=(a,b)=>Math.round((b-a)/864e5);
+const dayOf=ts=>{const d=new Date(ts);d.setHours(0,0,0,0);return d};
+const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
+function enteredStage(j,stage){const c=(S.cps||[]).filter(c=>c.job_id===j.id&&c.stage===stage).pop();return c?dayOf(c.done_at):(stage==='Lead'?dayOf(j.created_at):null)}
+function replyStatus(j){
+  if(j.stage!=='Lead'||j.contacted_at)return null;
+  const since=dayOf(j.created_at),due=addDays(since,+(S.settings.reply_due_days??2)),left=daysBetween(today0(),due);
+  return {due,left,late:left<0}}
+function quoteStatus(j){
+  if(!['Lead','Design'].includes(j.stage)||j.quote_date)return null;
+  const from=j.stage==='Design'?(enteredStage(j,'Design')||dayOf(j.created_at)):dayOf(j.created_at);
+  const due=addDays(from,+(S.settings.quote_due_days??7)),left=daysBetween(today0(),due);
+  return {from,due,left,late:left<0,soon:left>=0&&left<=2}}
+function promiseOf(j){
+  if(!j.promised_on||!j.promised_weeks_min)return null;
+  const on=parse(j.promised_on),from=addDays(on,7*j.promised_weeks_min),to=addDays(on,7*(j.promised_weeks_max||j.promised_weeks_min));
+  const t0=today0(),warn=+(S.settings.promise_warn_days??14);
+  let state='ok',msg='';
+  if(!OPEN.includes(j.stage)||j.stage==='On site'){state='done'}
+  else if(j.start_date&&parse(j.start_date)>to){state='late';msg=`Booked to start ${fmtD(j.start_date)}, after the ${fmtShort(iso(to))} promise`}
+  else if(!j.start_date&&t0>to){state='late';msg=`Promised by ${fmtShort(iso(to))}. Not on the board`}
+  else if(!j.start_date&&daysBetween(t0,from)<=warn){state='soon';msg=`Window opens ${fmtShort(iso(from))}. Not on the board yet`}
+  else if(j.start_date){state='booked';msg=`Starts ${fmtD(j.start_date)}, inside the promise`}
+  else{msg=`Window ${fmtShort(iso(from))} to ${fmtShort(iso(to))}`}
+  return {on,from,to,state,msg,label:`${j.promised_weeks_min}${j.promised_weeks_max&&j.promised_weeks_max!==j.promised_weeks_min?' to '+j.promised_weeks_max:''} weeks`}}
+function nameOf(j){return isMkt()?(j.suburb||'Job'):(j.clients?.name||j.suburb||'No name')}
+function timingAlerts(){
+  const out=[];
+  for(const j of S.jobs){
+    const p=promiseOf(j);if(p&&p.state==='late')out.push({lvl:'bad',kind:'promise',j,t:`Start date promise missed · ${esc(nameOf(j))}`,s:p.msg});
+    const r=replyStatus(j);if(r&&r.left<=0)out.push({lvl:r.late?'bad':'warn',kind:'reply',j,t:`Reply to ${esc(nameOf(j))}`,s:`Enquired ${fmtShort(iso(dayOf(j.created_at)))}${r.late?`. ${-r.left} day${r.left===-1?'':'s'} overdue`:'. Due today'}`});
+    const q=quoteStatus(j);if(q&&(q.late||q.soon))out.push({lvl:q.late?'bad':'warn',kind:'quote',j,t:`Quote ${esc(nameOf(j))}`,s:q.late?`Due ${fmtShort(iso(q.due))}. ${-q.left} day${q.left===-1?'':'s'} late`:`Due ${q.left===0?'today':fmtD(iso(q.due))}`});
+    if(p&&p.state==='soon')out.push({lvl:'warn',kind:'promise',j,t:`Book ${esc(nameOf(j))} in`,s:p.msg});
+  }
+  return out.sort((a,b)=>(a.lvl==='bad'?0:1)-(b.lvl==='bad'?0:1));
+}
+async function rescheduleJob(j,sd){
+  const ts=tasksFor(j.id),crew=j.crew_size||S.settings.default_crew||2;
+  const days=j.start_date&&j.end_date?Math.max(1,workDaysBetween(parse(j.start_date),parse(j.end_date)))
+    :jobHours(ts)>0?jobDays(ts,crew):j.quoted_crew_days?Math.max(1,Math.ceil(j.quoted_crew_days/crew)):Math.max(1,Math.ceil(avgJobCrewDays()/crew));
+  const start=nextWork(parse(sd)),patch={start_date:iso(start),end_date:iso(addWorkDays(start,days))};
+  const lt=layoutTasks({start_date:patch.start_date,crew_size:j.crew_size},ts.map(t=>({...t})));
+  const res=await Promise.all([sb.from('jobs').update(patch).eq('id',j.id),...lt.map(t=>sb.from('job_tasks').update({start_date:t.start_date,end_date:t.end_date}).eq('id',t.id))]);
+  const err=res.find(r=>r.error);if(err)return toast(err.error.message);
+  Object.assign(j,patch);toast(`${nameOf(j)} moved to ${fmtD(patch.start_date)}`);await loadAll();render();
+}
 
 /* ---------- auth ---------- */
 async function boot(){
@@ -287,6 +364,7 @@ function renderLogin(){
 
 /* ---------- shell ---------- */
 const IC={
+ lock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
  home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>',
  jobs:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
  board:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h9M6 12h12M10 18h11"/></svg>',
@@ -297,16 +375,17 @@ const IC={
 };
 function go(v,id){S.view=v;if(id!==undefined)S.jobId=id;render();scrollTo(0,0)}
 function render(){
-  const tabs=isStaff()?[['home','Today',IC.home],['jobs','Jobs',IC.jobs],['board','Board',IC.board],['add','Log a day or job',IC.add],['nums','Numbers',IC.nums],['mkt','Marketing',IC.mkt]]
+  const tabs=isStaff()?[['home','Today',IC.home],['jobs','Jobs',IC.jobs],['board','Board',IC.board],['add','Log a day or job',IC.add],['nums','Numbers',IC.nums],['money','Money',IC.lock],['mkt','Marketing',IC.mkt]]
     :isMkt()?[['board','Board',IC.board],['mkt','Marketing',IC.mkt]]:[['board','Board',IC.board]];
   const allowed=new Set(tabs.map(t=>t[0]).concat(isStaff()?['job','review','rates','me']:['me']));
+  if(S.finUntil&&Date.now()>S.finUntil)S.finUntil=0;
   const v=allowed.has(S.view)?S.view:tabs[0][0];
   const cur=v==='job'||v==='review'?'jobs':v;
   $('#root').innerHTML=`<div class="app"><header class="top"><div class="brand"><b>BECK'S</b><span>LANDSCAPING HUB</span></div><button class="who" id="me">${esc(S.profile.name||'Me')}</button></header><main id="main"></main></div>
-  <nav class="tabs" aria-label="Main"><div class="brand nav-brand"><b>BECK'S</b><span>LANDSCAPING HUB</span></div>${tabs.map(([k,l,ic])=>`<button data-v="${k}" class="${k==='add'?'add':''} ${cur===k?'on':''}" aria-label="${l}">${ic}<span>${l}</span></button>`).join('')}<button class="nav-foot" id="me2">${esc(S.profile.name||'Me')} · ${esc(role())}</button></nav>`;
+  <nav class="tabs" aria-label="Main"><div class="brand nav-brand"><b>BECK'S</b><span>LANDSCAPING HUB</span></div>${tabs.map(([k,l,ic])=>`<button data-v="${k}" class="${k==='add'?'add':''} ${k==='money'?'desk':''} ${cur===k?'on':''}" aria-label="${l}">${ic}<span>${l}</span></button>`).join('')}<button class="nav-foot" id="me2">${esc(S.profile.name||'Me')} · ${esc(role())}</button></nav>`;
   document.querySelectorAll('nav.tabs button[data-v]').forEach(b=>b.onclick=()=>go(b.dataset.v));
   $('#me').onclick=()=>go('me');$('#me2').onclick=()=>go('me');
-  ({home:viewToday,jobs:viewJobs,board:viewBoard,add:viewAdd,review:viewReview,job:viewJob,nums:viewNumbers,mkt:viewMarketing,rates:viewRates,me:viewMe})[v]($('#main'));
+  ({home:viewToday,money:viewMoney,jobs:viewJobs,board:viewBoard,add:viewAdd,review:viewReview,job:viewJob,nums:viewNumbers,mkt:viewMarketing,rates:viewRates,me:viewMe})[v]($('#main'));
 }
 function stageBar(stage){const i=STAGES.indexOf(stage);return `<div class="stagebar">${STAGES.map((_,k)=>`<i class="${k<=i?'on':''}"></i>`).join('')}</div>`}
 function stagePill(s){const c=s==='Lost'?'bad':PENCIL.includes(s)?'warn':['Paid'].includes(s)?'grey':['Complete','Invoiced'].includes(s)?'good':'';return `<span class="pill ${c}">${esc(s)}</span>`}
@@ -319,27 +398,27 @@ function viewToday(el){
   const lost=finished.reduce((a,n)=>a+n.lostDollars,0),lostDays=finished.reduce((a,n)=>a+n.lostDays,0);
   const perDay=finished.filter(n=>n.perDay);
   const avgPerDay=perDay.length?perDay.reduce((a,n)=>a+n.quoteEx,0)/perDay.reduce((a,n)=>a+n.actualDays,0):NaN;
+  const withProfit=finished.filter(n=>n.profit!=null);
+  const profit=withProfit.reduce((a,n)=>a+n.profit,0),rev=withProfit.reduce((a,n)=>a+n.revenueEx,0);
   const chase=S.jobs.filter(j=>['Complete','Invoiced'].includes(j.stage));
-  const owed=chase.reduce((a,j)=>a+(+j.invoiced_total||+j.quote_total||0),0);
-  const oldest=[...chase].sort((a,b)=>String(a.closed_at||a.quote_date||a.created_at||'').localeCompare(String(b.closed_at||b.quote_date||b.created_at||'')));
   const wks=weeksAhead(8),cap=wks.reduce((a,w)=>a+w.cap,0),bookedD=wks.reduce((a,w)=>a+w.booked,0),free=wks.reduce((a,w)=>a+w.free,0);
   const nfs=nextFreeStart();
   const unlogged=S.jobs.filter(j=>['Complete','Invoiced','Paid'].includes(j.stage)&&!daysFor(j.id).length);
-  const noDates=S.jobs.filter(j=>BOOKED.includes(j.stage)&&!j.start_date);
-  const weekAgo=iso(new Date(t0.getTime()-7*864e5));
-  const staleQuotes=S.jobs.filter(j=>j.stage==='Quoted'&&String(j.quote_date||j.created_at||'').slice(0,10)<=weekAgo);
-  const leads=S.jobs.filter(j=>j.stage==='Lead');
-  const names=(js,n=3)=>js.slice(0,n).map(j=>esc(j.clients?.name||j.suburb||'No name')).join(', ')+(js.length>n?` and ${js.length-n} more`:'');
+  const noDates=S.jobs.filter(j=>BOOKED.includes(j.stage)&&!j.start_date&&!['late','soon'].includes(promiseOf(j)?.state));
+  const quotesOut=S.jobs.filter(j=>j.stage==='Quoted'&&String(j.quote_date||'').slice(0,10)&&String(j.quote_date).slice(0,10)<=iso(addDays(t0,-7)));
+  const noCost=S.crew.filter(c=>c.active!==false&&(c.cost_per_day==null||c.cost_per_day===''));
+  const names=(js,n=3)=>js.slice(0,n).map(j=>esc(nameOf(j))).join(', ')+(js.length>n?` and ${js.length-n} more`:'');
   const plural=(n,a,b)=>n===1?a:b;
 
-  const needs=[];
-  if(noDates.length)needs.push(['bad',`${noDates.length} booked ${plural(noDates.length,'job has','jobs have')} no start date`,`Not on the board yet. ${names(noDates)}`,'jobs','Open']);
-  if(chase.length)needs.push(['warn',`Chase ${chase.length} ${plural(chase.length,'invoice','invoices')} · ${money(owed)}`,`Oldest first. ${names(oldest)}`,'jobs','Open']);
-  if(staleQuotes.length)needs.push(['warn',`${staleQuotes.length} ${plural(staleQuotes.length,'quote','quotes')} out over a week`,`Follow up. ${names(staleQuotes)}`,'jobs','Open']);
-  if(leads.length)needs.push(['info',`${leads.length} new ${plural(leads.length,'enquiry','enquiries')}`,`Book the design. ${names(leads)}`,'jobs','Open']);
-  if(unlogged.length)needs.push(['warn',`${unlogged.length} finished ${plural(unlogged.length,'job has','jobs have')} no crew log`,'Labour figures only count jobs with logged days','nums','Log']);
+  const needs=timingAlerts().map(a=>[a.lvl,a.t,a.s,'job',a.kind==='quote'?'Quote':a.kind==='reply'?'Call':'Book',a.j.id]);
+  if(noDates.length)needs.push(['bad',`${noDates.length} booked ${plural(noDates.length,'job has','jobs have')} no start date`,`Not on the board. ${names(noDates)}`,'board','Board']);
+  if(quotesOut.length)needs.push(['warn',`${quotesOut.length} ${plural(quotesOut.length,'quote','quotes')} out over a week`,`Follow up. ${names(quotesOut)}`,'jobs','Open']);
+  if(chase.length)needs.push(['warn',`Chase ${chase.length} ${plural(chase.length,'invoice','invoices')}`,`Oldest first. ${names(chase)}`,'money','Money']);
+  if(unlogged.length)needs.push(['warn',`${unlogged.length} finished ${plural(unlogged.length,'job has','jobs have')} no crew log`,'Profit and labour only count jobs with logged days','nums','Log']);
+  if(noCost.length&&finished.length)needs.push(['info','Add what the crew cost a day',`Job profit needs it. ${noCost.map(c=>esc(c.name)).join(', ')}`,'rates','Rates']);
   if(cap&&free/cap>.4)needs.push(['info',`Board has room from ${fmtD(iso(nfs))}`,`${Math.round(free)} crew days free over 8 weeks. Push the $990 design.`,'mkt','Plan']);
 
+  const promised=S.jobs.map(j=>({j,p:promiseOf(j)})).filter(x=>x.p&&x.p.state!=='done').sort((a,b)=>a.p.from-b.p.from);
   const stageRows=STAGES.concat(['Lost']).map(s=>({s,n:S.jobs.filter(j=>j.stage===s).length}));
   const maxN=Math.max(1,...stageRows.map(r=>r.n));
   const stageColour=s=>s==='Lost'?'var(--bad)':PENCIL.includes(s)?'var(--sand)':['Complete','Invoiced'].includes(s)?'var(--warn)':s==='Paid'?'var(--green-2)':'var(--green)';
@@ -347,29 +426,80 @@ function viewToday(el){
   const hello=now.getHours()<12?'Good morning':now.getHours()<17?'Good afternoon':'Good evening';
   const firstName=(S.profile.name||'').split(' ')[0];
   const logged=`Based on ${finished.length} ${plural(finished.length,'job','jobs')} with a crew log`;
+  const pState={late:['bad','Missed'],soon:['warn','Book in'],booked:['good','Booked'],ok:['grey','Waiting']};
 
   el.innerHTML=`<div class="today-head"><div><div class="eyebrow">${t0.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'})}</div>
    <h1>${hello}${firstName?', '+esc(firstName):''}</h1></div></div>
+  ${S.dbReady?'':`<div class="need info" style="cursor:default;margin-top:12px"><span class="dot"></span><span class="txt"><b>Database update waiting</b><span>Enquiries, promised start windows and the finance password switch on once it has run.</span></span></div>`}
   <div class="tiles">
-   <div class="tile dark"><div class="eyebrow">To invoice or chase</div><div class="v">${money(owed)}</div>
-    <div class="s">${chase.length} finished ${plural(chase.length,'job','jobs')}, not paid</div><div class="src">Jobs at Complete or Invoiced</div></div>
-   <div class="tile"><div class="eyebrow">Crew days free</div><div class="v">${Math.round(free)}</div>
-    <div class="s">Next 8 weeks${isFinite(free/avgJobCrewDays())?` · about ${Math.max(0,Math.floor(free/avgJobCrewDays()))} jobs of room`:''}</div>
-    <div class="meter" role="img" aria-label="${r1(bookedD)} of ${cap} crew days booked"><i style="width:${cap?Math.min(100,bookedD/cap*100):0}%"></i></div>
-    <div class="src">${r1(bookedD)} of ${cap} booked · from the board</div></div>
+   <div class="tile dark"><div class="eyebrow">Job profit</div><div class="v">${withProfit.length?money(profit):'–'}</div>
+    <div class="s">${withProfit.length?`${pct(profit/rev)} margin on ${withProfit.length} ${plural(withProfit.length,'job','jobs')}`:'Needs crew cost per day in Rates'}</div>
+    <div class="src">Quote ex GST, less materials and crew cost</div></div>
    <div class="tile"><div class="eyebrow">Labour given away</div><div class="v ${lost>0?'bad':''}">${money(lost)}</div>
     <div class="s">${r1(lostDays)} crew days past quote</div><div class="src">${logged}</div></div>
    <div class="tile"><div class="eyebrow">Earned per crew day</div><div class="v">${isFinite(avgPerDay)?money(avgPerDay):'–'}</div>
     <div class="s">Charged at ${money(DAY_RATE())} a crew day</div><div class="src">${logged}</div></div>
+   <div class="tile"><div class="eyebrow">Crew days free</div><div class="v">${Math.round(free)}</div>
+    <div class="s">Next 8 weeks${isFinite(free/avgJobCrewDays())?` · about ${Math.max(0,Math.floor(free/avgJobCrewDays()))} jobs of room`:''}</div>
+    <div class="meter" role="img" aria-label="${r1(bookedD)} of ${cap} crew days booked"><i style="width:${cap?Math.min(100,bookedD/cap*100):0}%"></i></div>
+    <div class="src">${r1(bookedD)} of ${cap} booked · from the board</div></div>
   </div>
   <div class="today-grid">
-   <div class="card"><h2>Needs you</h2>
-    ${needs.length?needs.map(([k,t,s,v,b])=>`<button class="need ${k==='warn'?'':k}" data-go="${v}"><span class="dot"></span><span class="txt"><b>${t}</b><span>${s}</span></span><span class="go">${b}</span></button>`).join(''):'<p class="small muted" style="margin:10px 0 0">Nothing needs you today.</p>'}</div>
+   <div class="card"><div class="row between"><h2>Needs you</h2><span class="small muted">${needs.length}</span></div>
+    ${needs.length?needs.map(([k,t,s,v,b,id])=>`<button class="need ${k==='warn'?'':k}" data-go="${v}"${id?` data-id="${id}"`:''}><span class="dot"></span><span class="txt"><b>${t}</b><span>${s}</span></span><span class="go">${b}</span></button>`).join(''):'<p class="small muted" style="margin:10px 0 0">Nothing needs you today.</p>'}</div>
+   <div class="card"><div class="row between"><h2>Promised start dates</h2><span class="small muted">${promised.length}</span></div>
+    ${promised.length?promised.map(({j,p})=>`<button class="need ${pState[p.state][0]==='bad'?'bad':pState[p.state][0]==='warn'?'':'info'}" data-go="job" data-id="${j.id}"><span class="dot"></span><span class="txt"><b>${esc(nameOf(j))} · ${p.label}</b><span>${fmtShort(iso(p.from))} to ${fmtShort(iso(p.to))}. ${j.start_date?'Starts '+fmtD(j.start_date):'Not on the board'}</span></span><span class="pill ${pState[p.state][0]}">${pState[p.state][1]}</span></button>`).join(''):`<p class="small muted" style="margin:10px 0 0">When Greg tells a client "8 to 10 weeks", add it on the job. It shows here and on the board.</p>`}</div>
    <div class="card"><div class="row between"><h2>Where every job sits</h2><span class="small muted">${S.jobs.length} jobs</span></div>
     <div style="margin-top:8px">${stageRows.map(r=>`<div class="stg"><span class="n">${esc(r.s)}</span><span class="t"><i style="width:${r.n/maxN*100}%;background:${stageColour(r.s)}"></i></span><span class="c">${r.n}</span></div>`).join('')}</div></div>
-  </div>
-  <div class="card"><div class="row between"><h2>This week on site</h2><button class="btn light sm" data-go="board">Board</button></div>${weekList(live,monday(t0))}</div>`;
-  el.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
+   <div class="card"><div class="row between"><h2>This week on site</h2><button class="btn light sm" data-go="board">Board</button></div>${weekList(live,monday(t0))}</div>
+  </div>`;
+  el.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>b.dataset.id?go('job',b.dataset.id):go(b.dataset.go));
+}
+
+/* ---------- money (owner and admin, behind the finance password) ---------- */
+function viewMoney(el){
+  const head=`<div class="row between" style="margin:18px 0 6px"><h1>Money</h1>${S.finUntil?`<button class="btn light sm" id="lock">Lock</button>`:''}</div>`;
+  if(S.finSet===null){el.innerHTML=head+`<div class="card"><h2>Locked</h2><p class="small muted" style="margin:6px 0 0">The finance password switches on once the database update has run.</p></div>`;return}
+  if(!S.finSet){
+    el.innerHTML=head+`<div class="card" style="max-width:440px"><h2>Set the finance password</h2><p class="small muted" style="margin:6px 0 0">One password for Greg and Kaitlin. Invoices, booked work and quotes out stay behind it.</p>
+     <label for="np">New password</label><input id="np" type="password" autocomplete="new-password">
+     <label for="np2">Type it again</label><input id="np2" type="password" autocomplete="new-password">
+     <button class="btn" id="setp" style="margin-top:12px">Set password</button></div>`;
+    $('#setp').onclick=async()=>{const a=$('#np').value,b=$('#np2').value;if(a.length<6)return toast('Use at least 6 characters');if(a!==b)return toast("They don't match");
+      const {error}=await sb.rpc('set_finance_password',{new_pass:a});if(error)return toast(error.message);S.finSet=true;S.finUntil=Date.now()+15*6e4;toast('Password set');render()};
+    return}
+  if(!S.finUntil){
+    el.innerHTML=head+`<div class="card" style="max-width:440px"><h2>Finance password</h2><p class="small muted" style="margin:6px 0 0">Unlocks for 15 minutes.</p>
+     <label for="fp">Password</label><input id="fp" type="password" autocomplete="current-password">
+     <button class="btn" id="unl" style="margin-top:12px">Unlock</button></div>`;
+    const tryIt=async()=>{const {data,error}=await sb.rpc('check_finance_password',{pass:$('#fp').value});if(error)return toast(error.message);if(!data){$('#fp').value='';return toast('Wrong password')}
+      S.finUntil=Date.now()+15*6e4;render()};
+    $('#unl').onclick=tryIt;$('#fp').onkeydown=e=>{if(e.key==='Enter')tryIt()};$('#fp').focus();return}
+
+  const chase=S.jobs.filter(j=>['Complete','Invoiced'].includes(j.stage)).map(j=>({j,amt:+j.invoiced_total||+j.quote_total||0,since:j.closed_at||null})).sort((a,b)=>String(a.since||'').localeCompare(String(b.since||''))||(a.j.job_no||0)-(b.j.job_no||0));
+  const owed=chase.reduce((a,c)=>a+c.amt,0);
+  const booked=S.jobs.filter(j=>BOOKED.includes(j.stage)).reduce((a,j)=>a+(+j.quote_total||0),0);
+  const out=S.jobs.filter(j=>['Lead','Design','Quoted'].includes(j.stage)).reduce((a,j)=>a+(+j.quote_total||0),0);
+  const imports=chase.filter(c=>/xero/i.test(c.j.notes||'')||!daysFor(c.j.id).length).length;
+  el.innerHTML=head+`<div class="tiles">
+    <div class="tile dark"><div class="eyebrow">To invoice or chase</div><div class="v">${money(owed)}</div><div class="s">${chase.length} finished, not paid</div><div class="src">Jobs at Complete or Invoiced · inc GST</div></div>
+    <div class="tile"><div class="eyebrow">Booked work</div><div class="v">${money(booked)}</div><div class="s">Accepted, not finished</div><div class="src">Quote totals inc GST</div></div>
+    <div class="tile"><div class="eyebrow">Quotes out</div><div class="v">${money(out)}</div><div class="s">Waiting on a yes</div><div class="src">Quote totals inc GST</div></div>
+    <div class="tile"><div class="eyebrow">Unlocked</div><div class="v" style="font-size:22px">${new Date(S.finUntil).toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit'})}</div><div class="s">Locks again at this time</div><div class="src"><a href="#" id="chg" style="color:inherit">Change password</a></div></div>
+   </div>
+   <div class="card"><div class="row between"><h2>To invoice or chase</h2><span class="small muted">Oldest first</span></div>
+    ${imports>chase.length/2?`<p class="small" style="margin:6px 0 0"><span class="pill warn">Check</span> Most of these came across from Xero. Mark the ones already paid so this is right.</p>`:''}
+    <div style="overflow-x:auto"><table style="margin-top:8px;min-width:480px"><thead><tr><th>Client</th><th>Suburb</th><th>Stage</th><th class="num">Finished</th><th class="num">Amount</th></tr></thead><tbody>
+    ${chase.map(c=>`<tr data-id="${c.j.id}" style="cursor:pointer"><td><b class="small">${esc(c.j.clients?.name||'')}</b></td><td class="small muted">${esc(c.j.suburb||'')}</td><td>${stagePill(c.j.stage)}</td><td class="num small">${c.since?fmtShort(String(c.since).slice(0,10)):'<span class="muted">Xero</span>'}</td><td class="num">${money(c.amt)}</td></tr>`).join('')||'<tr><td colspan="5" class="small muted">Nothing to chase.</td></tr>'}
+    </tbody></table></div></div>
+   <div class="card" id="chgbox" style="max-width:440px;display:none"><h2>Change password</h2>
+    <label for="op">Current password</label><input id="op" type="password" autocomplete="current-password">
+    <label for="np">New password</label><input id="np" type="password" autocomplete="new-password">
+    <button class="btn light sm" id="chgp" style="margin-top:10px">Save</button></div>`;
+  $('#lock').onclick=()=>{S.finUntil=0;render()};
+  el.querySelectorAll('tr[data-id]').forEach(r=>r.onclick=()=>go('job',r.dataset.id));
+  $('#chg').onclick=e=>{e.preventDefault();$('#chgbox').style.display='block'};
+  $('#chgp').onclick=async()=>{const {error}=await sb.rpc('set_finance_password',{new_pass:$('#np').value,old_pass:$('#op').value});toast(error?error.message:'Password changed');if(!error)$('#chgbox').style.display='none'};
 }
 
 function viewJobs(el){
@@ -390,14 +520,22 @@ function viewJobs(el){
 
 /* ---------- board: gantt + capacity ---------- */
 function viewBoard(el){
-  const live=S.jobs.filter(j=>j.start_date&&j.end_date&&!['Lost','Paid'].includes(j.stage)&&j.end_date>=iso(new Date(today0().getTime()-14*864e5))).sort((a,b)=>a.start_date.localeCompare(b.start_date));
-  const W=30,from=monday(today0());let to=new Date(from);to.setDate(to.getDate()+55);
-  for(const j of live){const e=parse(j.end_date);if(e>to)to=new Date(e.getTime()+7*864e5)}
+  const t0=today0(),cut=iso(new Date(t0.getTime()-14*864e5));
+  const rows=S.jobs.map(j=>({j,p:promiseOf(j)})).filter(({j,p})=>(j.start_date&&j.end_date&&!['Lost','Paid'].includes(j.stage)&&j.end_date>=cut)||(p&&p.state!=='done'))
+    .sort((a,b)=>(a.j.start_date?parse(a.j.start_date):a.p.from)-(b.j.start_date?parse(b.j.start_date):b.p.from));
+  const live=rows.filter(r=>r.j.start_date&&r.j.end_date).map(r=>r.j);
+  const W=30,from=monday(t0);let to=new Date(from);to.setDate(to.getDate()+55);
+  for(const {j,p} of rows){const e=j.end_date?parse(j.end_date):p.to;const e2=p&&p.to>e?p.to:e;if(e2>to)to=new Date(e2.getTime()+7*864e5)}
   const days=[];for(let d=new Date(from);d<=to;d.setDate(d.getDate()+1))days.push(new Date(d));
-  const idx=s=>Math.round((parse(s)-from)/864e5);
+  const idxD=d=>Math.round((dayOf(d)-from)/864e5),idx=s=>idxD(parse(s));
   const wks=weeksAhead(12),free8=wks.slice(0,8).reduce((a,w)=>a+w.free,0),avg=avgJobCrewDays(),nfs=nextFreeStart();
-  const t0=today0();
   const cls=j=>PENCIL.includes(j.stage)?'pencil':j.stage==='On site'?'onsite':BOOKED.includes(j.stage)?'booked':'done';
+  const e0=(p,j)=>!j.start_date&&idxD(p.to)<idxD(t0);
+  const canDrag=j=>isStaff()&&!['Complete','Invoiced','Paid','Lost'].includes(j.stage);
+  const band=(j,p)=>{if(!p||p.state==='done')return '';
+    if(e0(p,j))return `<div class="g-promise late ${canDrag(j)?'drag':''}" data-drag="${j.id}" data-base="${iso(nextWork(t0))}" data-tip="Promised by ${fmtShort(iso(p.to))}" style="left:${idxD(t0)*W}px;width:${6*W}px"><span>Missed. Promised by ${fmtShort(iso(p.to))}${canDrag(j)?' · drag to book':''}</span></div>`;
+    const s=Math.max(0,idxD(p.from)),e=idxD(p.to);if(e<0)return '';
+    const late=p.state==='late';return `<div class="g-promise ${late?'late':''} ${!j.start_date&&canDrag(j)?'drag':''}" ${!j.start_date?`data-drag="${j.id}" data-base="${iso(p.from)}"`:''} data-tip="Promised ${esc(p.label)} on ${fmtShort(j.promised_on)}: ${fmtShort(iso(p.from))} to ${fmtShort(iso(p.to))}" style="left:${s*W}px;width:${Math.max(1,e-s+1)*W}px">${j.start_date?'':`<span>Promised ${esc(p.label)}${canDrag(j)?' · drag to book':''}</span>`}</div>`};
   el.innerHTML=`<div class="row between" style="margin:18px 0 6px"><h1>Board</h1><span class="small muted">${activeCrew()} crew · ${S.settings.hours_per_day||8}h days</span></div>
   <div class="hero"><div class="eyebrow">Room to take on</div>
    <div class="big">${Math.round(free8)} crew days</div>
@@ -406,18 +544,35 @@ function viewBoard(el){
    <div class="weeks">${wks.map(w=>{const f=w.cap?w.booked/w.cap:0,p=w.cap?w.pencil/w.cap:0;return `<div class="wk" data-tip="Week of ${w.ws.toLocaleDateString('en-AU',{day:'numeric',month:'short'})}: ${r1(w.booked)} booked, ${r1(w.pencil)} pencilled, ${r1(w.free)} free of ${w.cap}"><b>${w.ws.toLocaleDateString('en-AU',{day:'numeric',month:'short'})}</b>
      <div class="bar"><i style="height:${Math.min(100,f*100)}%"></i><i style="height:${Math.min(100,(f+p)*100)}%;background:repeating-linear-gradient(45deg,#c9a96e 0 4px,#d6bb87 4px 8px);z-index:0;opacity:.9"></i><i style="height:${Math.min(100,f*100)}%;z-index:1"></i></div><span>${r1(w.free)} free</span></div>`}).join('')}</div>
    <div class="legend"><span><b style="background:var(--green)"></b>Booked</span><span><b style="background:repeating-linear-gradient(45deg,#c9a96e 0 4px,#d6bb87 4px 8px)"></b>Quoted, pencilled in</span><span><b style="background:#efece4;border:1px solid var(--line)"></b>Free</span></div></div>
-  <h2 style="margin:18px 0 8px">Every job on the board</h2>
-  ${live.length?`<div class="gantt"><div style="width:${128+days.length*W}px">
+  <div class="row between" style="margin:18px 0 8px"><h2>Every job on the board</h2>${isStaff()&&rows.length?'<span class="small muted">Drag a bar to move it</span>':''}</div>
+  ${rows.length?`<div class="gantt"><div style="width:${128+days.length*W}px">
    <div class="g-hdr"><div class="g-lab" style="height:auto;background:#faf8f2">Job</div>${days.map(d=>`<div class="g-day ${isWork(d)?'':'we'} ${+d===+t0?'today':''}" style="width:${W}px">${d.toLocaleDateString('en-AU',{weekday:'narrow'})}<br>${d.getDate()}${d.getDate()===1||+d===+from?'<br>'+d.toLocaleDateString('en-AU',{month:'short'}):''}</div>`).join('')}</div>
-   ${live.map(j=>{const s=Math.max(0,idx(j.start_date)),e=idx(j.end_date);return `<div class="g-row"><div class="g-lab" data-id="${j.id}">${esc(isMkt()?(j.suburb||'Job'):(j.clients?.name||j.title||'Job'))}<small>${esc(isMkt()?j.title||'':j.suburb||'')} · ${j.crew_size||2} crew</small></div>
+   ${rows.map(({j,p})=>{const has=j.start_date&&j.end_date,s=has?Math.max(0,idx(j.start_date)):0,e=has?idx(j.end_date):0;return `<div class="g-row"><div class="g-lab" data-id="${j.id}">${esc(isMkt()?(j.suburb||'Job'):(j.clients?.name||j.title||'Job'))}<small>${esc(isMkt()?j.title||'':j.suburb||'')} · ${j.crew_size||2} crew</small></div>
     <div class="g-lane" style="width:${days.length*W}px">${days.map((d,k)=>isWork(d)?'':`<div style="position:absolute;left:${k*W}px;top:0;bottom:0;width:${W}px;background:#f6f3ec"></div>`).join('')}
-    <div style="position:absolute;left:${idx(iso(t0))*W+W/2}px;top:0;bottom:0;width:1px;background:var(--bad);opacity:.5"></div>
-    <div class="g-bar ${cls(j)}" data-id="${j.id}" data-tip="${esc((j.clients?.name&&!isMkt()?j.clients.name+' · ':'')+j.stage+' · '+fmtShort(j.start_date)+' to '+fmtShort(j.end_date))}" style="left:${s*W+2}px;width:${Math.max(1,e-s+1)*W-4}px">${esc(j.stage)}${j.title?' · '+esc(j.title):''}</div></div></div>`}).join('')}
+    ${band(j,p)}
+    <div style="position:absolute;left:${idxD(t0)*W+W/2}px;top:0;bottom:0;width:1px;background:var(--bad);opacity:.5"></div>
+    ${has?`<div class="g-bar ${cls(j)} ${canDrag(j)?'drag':''}" data-id="${j.id}" ${canDrag(j)?`data-drag="${j.id}" data-base="${j.start_date}"`:''} data-tip="${esc((j.clients?.name&&!isMkt()?j.clients.name+' · ':'')+j.stage+' · '+fmtShort(j.start_date)+' to '+fmtShort(j.end_date))}" style="left:${s*W+2}px;width:${Math.max(1,e-s+1)*W-4}px">${esc(j.stage)}${j.title?' · '+esc(j.title):''}</div>`:''}</div></div>`}).join('')}
   </div></div>
-  <div class="legend"><span><b style="background:repeating-linear-gradient(45deg,#c9a96e 0 4px,#d6bb87 4px 8px)"></b>Lead, design or quote (pencilled)</span><span><b style="background:var(--green)"></b>Booked</span><span><b style="background:var(--green-2)"></b>On site</span><span><b style="background:#8d9a97"></b>Finished</span><span><b style="background:var(--bad);width:2px"></b>Today</span></div>`:`<div class="empty">Nothing booked yet.</div>`}
+  <div class="legend"><span><b style="background:repeating-linear-gradient(45deg,#c9a96e 0 4px,#d6bb87 4px 8px)"></b>Lead, design or quote (pencilled)</span><span><b style="background:var(--green)"></b>Booked</span><span><b style="background:var(--green-2)"></b>On site</span><span><b style="background:#8d9a97"></b>Finished</span><span><b style="background:rgba(201,169,110,.18);border:1.5px dashed var(--sand)"></b>Promised start window</span><span><b style="background:var(--bad);width:2px"></b>Today</span></div>`:`<div class="empty">Nothing booked yet.</div>`}
   ${isStaff()?`<div class="card"><h2>This week on site</h2>${weekList(live,monday(t0))}</div>`:''}`;
-  if(isStaff())el.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>go('job',b.dataset.id));
+  if(isStaff())el.querySelectorAll('.g-lab[data-id]').forEach(b=>b.onclick=()=>go('job',b.dataset.id));
+  bindDrag(el,W);
   bindTips(el);
+}
+function bindDrag(el,W){
+  el.querySelectorAll('.g-bar[data-id]:not([data-drag])').forEach(b=>b.onclick=()=>isStaff()&&go('job',b.dataset.id));
+  el.querySelectorAll('[data-drag]').forEach(bar=>{
+    let x0=null,left0=0,moved=0;
+    bar.addEventListener('pointerdown',e=>{if(e.button>0)return;x0=e.clientX;left0=parseFloat(bar.style.left);moved=0;bar.setPointerCapture(e.pointerId);bar.classList.add('lift')});
+    bar.addEventListener('pointermove',e=>{if(x0==null)return;const dx=e.clientX-x0;if(Math.abs(dx)>5)moved=1;if(!moved)return;
+      const k=Math.round(dx/W);bar.style.left=(left0+k*W)+'px';const d=addDays(parse(bar.dataset.base),k);$('#tip').textContent=(k?'Start '+fmtD(iso(nextWork(d))):'Drop to keep');$('#tip').style.opacity=1;$('#tip').style.left=Math.min(innerWidth-250,e.clientX+12)+'px';$('#tip').style.top=(e.clientY-36)+'px'});
+    const end=async e=>{if(x0==null)return;const dx=e.clientX-x0,k=Math.round(dx/W);x0=null;bar.classList.remove('lift');$('#tip').style.opacity=0;
+      const j=S.jobs.find(x=>x.id===bar.dataset.drag);if(!j)return;
+      if(!moved)return go('job',j.id);
+      if(!k&&j.start_date){bar.style.left=left0+'px';return}
+      await rescheduleJob(j,iso(addDays(parse(bar.dataset.base),k)))};
+    bar.addEventListener('pointerup',end);bar.addEventListener('pointercancel',()=>{if(x0==null)return;x0=null;bar.style.left=left0+'px';bar.classList.remove('lift');$('#tip').style.opacity=0});
+  });
 }
 function weekList(jobs,from){const end=new Date(from);end.setDate(end.getDate()+6);const items=[];
   for(const j of jobs)for(const t of tasksFor(j.id)){if(!t.start_date)continue;const s=parse(t.start_date),e=parse(t.end_date||t.start_date);if(e<from||s>end)continue;items.push({j,t,s})}
@@ -441,25 +596,25 @@ function viewNumbers(el){
   const pipeline=S.jobs.filter(j=>['Lead','Design','Quoted'].includes(j.stage)).reduce((a,j)=>a+(+j.quote_total||0),0);
   const booked=S.jobs.filter(j=>BOOKED.includes(j.stage)).reduce((a,j)=>a+(+j.quote_total||0),0);
   const unlogged=S.jobs.filter(j=>['Complete','Invoiced','Paid'].includes(j.stage)&&!daysFor(j.id).length);
-  el.innerHTML=`<div class="row between" style="margin:18px 0 6px"><h1>Numbers</h1><span class="small muted">From crew logs and quotes</span></div>
+  const wp=finished.filter(n=>n.profit!=null),profitT=wp.reduce((a,n)=>a+n.profit,0),revT=wp.reduce((a,n)=>a+n.revenueEx,0);
+  el.innerHTML=`<div class="row between" style="margin:18px 0 6px"><h1>Numbers</h1><button class="btn light sm" id="toMoney">${IC.lock.replace('<svg','<svg width="14" height="14" style="vertical-align:-2px;margin-right:4px"')}Money</button></div>
   <div class="hero"><div class="eyebrow">Labour given away</div><div class="big">${money(lost)}</div>
    <p>${r1(lostDays)} crew days worked past the quote on finished jobs, not counting variations, at ${money(DAY_RATE())} a crew day.${qd?` Jobs ran ${pct(ad/qd-1)} over the quoted days.`:''}</p></div>
   <div class="kpis">
    <div class="kpi"><div class="eyebrow">Earned per crew day</div><div class="v">${isFinite(avgPerDay)?money(avgPerDay):'–'}</div><div class="s">Quote ex GST divided by crew days actually worked</div></div>
    <div class="kpi"><div class="eyebrow">Quote win rate</div><div class="v">${pct(winRate)}</div><div class="s">${won.length} won of ${decided.length} decided${decided.length<5?'. Needs more jobs to mean much':''}</div></div>
-   <div class="kpi"><div class="eyebrow">Booked work</div><div class="v">${money(booked)}</div><div class="s">Accepted, not yet finished. Plus ${money(pipeline)} in quotes out</div></div>
-   <div class="kpi ${owed?'alert':''}"><div class="eyebrow">To invoice or chase</div><div class="v">${money(owed)}</div><div class="s">Finished or invoiced, not paid</div></div>
+   <div class="kpi"><div class="eyebrow">Job profit</div><div class="v">${wp.length?money(profitT):'–'}</div><div class="s">${wp.length?`${pct(profitT/revT)} margin on ${wp.length} job${wp.length>1?'s':''}`:'Add crew cost per day in Rates to see this'}</div></div>
   </div>
   <div class="card"><div class="row between"><h2>Quoted vs worked, crew days</h2></div>
    <p class="small muted" style="margin:4px 0 0">Each finished job. The gap is time Greg didn't charge for.</p>
    ${finished.length?daysChart(finished):'<p class="small muted">Log crew days on a finished job to see this.</p>'}</div>
-  <div class="card"><h2>Job by job</h2><table style="margin-top:8px"><thead><tr><th>Job</th><th class="num">Quoted</th><th class="num">Worked</th><th class="num">Variation</th><th class="num">Over</th></tr></thead><tbody>
-   ${finished.map(n=>`<tr data-id="${n.j.id}" style="cursor:pointer"><td><b class="small">${esc(n.j.clients?.name||'')}</b><div class="tiny muted">${esc(n.j.suburb||'')}</div></td><td class="num">${r1(n.qDays)}d</td><td class="num">${r1(n.actualDays)}d</td><td class="num">${r1(n.varDays)}d</td><td class="num" style="color:${n.lostDollars>0?'var(--bad)':'var(--good)'};font-weight:600">${money(n.lostDollars)}</td></tr>`).join('')||'<tr><td colspan="5" class="muted small">No crew logs yet</td></tr>'}
+  <div class="card"><h2>Job by job</h2><table style="margin-top:8px"><thead><tr><th>Job</th><th class="num">Quoted</th><th class="num">Worked</th><th class="num">Variation</th><th class="num">Over</th><th class="num">Profit</th></tr></thead><tbody>
+   ${finished.map(n=>`<tr data-id="${n.j.id}" style="cursor:pointer"><td><b class="small">${esc(n.j.clients?.name||'')}</b><div class="tiny muted">${esc(n.j.suburb||'')}</div></td><td class="num">${r1(n.qDays)}d</td><td class="num">${r1(n.actualDays)}d</td><td class="num">${r1(n.varDays)}d</td><td class="num" style="color:${n.lostDollars>0?'var(--bad)':'var(--good)'};font-weight:600">${money(n.lostDollars)}</td><td class="num" style="font-weight:600;color:${n.profit==null?'var(--mut)':n.profit<0?'var(--bad)':'var(--good)'}">${n.profit==null?'–':money(n.profit)}</td></tr>`).join('')||'<tr><td colspan="6" class="muted small">No crew logs yet</td></tr>'}
   </tbody></table>
   ${unlogged.length?`<p class="small" style="margin:10px 0 0"><span class="pill warn">${unlogged.length} finished job${unlogged.length>1?'s':''} with no crew log</span> ${unlogged.map(j=>esc(j.clients?.name)).join(', ')}. Log who worked which day so these count.</p>`:''}</div>
-  <div class="card small muted">How lost labour is worked out: crew days logged minus variation days minus quoted crew days, times ${money(DAY_RATE())}. Quoted crew days come from the labour figure on the quote divided by ${money(DAY_RATE())}. <a href="#" id="toRates" style="color:var(--green-2)">Rates and day rate</a></div>`;
+  <div class="card small muted">How job profit is worked out: the invoice or quote ex GST, less materials (supplier costs when logged, otherwise the materials in the quote), less each logged crew day at that person's cost per day.<br><br>How lost labour is worked out: crew days logged minus variation days minus quoted crew days, times ${money(DAY_RATE())}. Quoted crew days come from the labour figure on the quote divided by ${money(DAY_RATE())}. <a href="#" id="toRates" style="color:var(--green-2)">Rates and day rate</a></div>`;
   el.querySelectorAll('tr[data-id]').forEach(r=>r.onclick=()=>go('job',r.dataset.id));
-  $('#toRates').onclick=e=>{e.preventDefault();go('rates')};
+  $('#toRates').onclick=e=>{e.preventDefault();go('rates')};$('#toMoney').onclick=()=>go('money');
   bindTips(el);
 }
 function daysChart(list){
@@ -481,8 +636,18 @@ async function viewMarketing(el){
   const wks=weeksAhead(8);
   const status=w=>{const f=w.cap?(w.booked+w.pencil)/w.cap:1;return f<.6?['push','Push the design offer','Spare crew days. Run lead ads and design posts.']:f<.9?['steady','On track','Mix of brand and design content.']:['hold','Full. Brand only','No lead ads. Show finished work and the crew.']};
   const ready=S.jobs.filter(j=>['On site','Complete','Invoiced','Paid'].includes(j.stage));
+  const leads=(S.leads||[]).filter(l=>l.created_at>=iso(addDays(today0(),-90)));
+  const bySrc=Object.entries(leads.reduce((a,l)=>(a[l.lead_source||'Other']=(a[l.lead_source||'Other']||0)+1,a),{})).sort((a,b)=>b[1]-a[1]);
+  const won=leads.filter(l=>!['Lead','Design','Quoted','Lost'].includes(l.stage)).length,maxS=Math.max(1,...bySrc.map(x=>x[1]));
   el.innerHTML=`<div class="row between" style="margin:18px 0 6px"><h1>Marketing</h1><span class="small muted">Runs off the board</span></div>
   <p class="small muted" style="margin:0 0 6px">When the board has room, push the $990 design. When it's full, show the work. Suburbs only, never street names.</p>
+  <div class="card"><div class="row between"><h2>Enquiries</h2><span class="small muted">Last 90 days</span></div>
+   ${S.leads===null?'<p class="small muted" style="margin:6px 0 0">Website enquiries show here once the database update has run.</p>':leads.length?`
+   <div class="kpis" style="margin-top:10px"><div class="kpi"><div class="eyebrow">Enquiries</div><div class="v">${leads.length}</div></div><div class="kpi"><div class="eyebrow">Became jobs</div><div class="v">${won}</div><div class="s">${pct(won/leads.length)} of enquiries</div></div></div>
+   <div style="margin-top:12px">${bySrc.map(([k,n])=>`<div class="stg"><span class="n">${esc(k)}</span><span class="t"><i style="width:${n/maxS*100}%;background:var(--green)"></i></span><span class="c">${n}</span></div>`).join('')}</div>
+   <div style="overflow-x:auto"><table style="margin-top:10px;min-width:420px"><thead><tr><th>Date</th><th>Name</th><th>Suburb</th><th>Source</th><th>Stage</th></tr></thead><tbody>
+   ${leads.slice(0,25).map(l=>`<tr><td class="small">${fmtShort(String(l.created_at).slice(0,10))}</td><td class="small"><b>${esc(l.first_name||'')}</b></td><td class="small muted">${esc(l.suburb||'')}</td><td class="small">${esc(l.lead_source||'')}</td><td>${stagePill(l.stage)}</td></tr>`).join('')}
+   </tbody></table></div>`:'<p class="small muted" style="margin:6px 0 0">No enquiries yet. Website enquiries land here and in Jobs as a Lead.</p>'}</div>
   <div class="card"><h2>Next 8 weeks</h2><table style="margin-top:8px"><tbody>
    ${wks.map(w=>{const[k,t,d]=status(w);const camps=S.camps.filter(c=>c.week_start===iso(w.ws));return `<tr><td style="width:70px"><b class="small">${w.ws.toLocaleDateString('en-AU',{day:'numeric',month:'short'})}</b><div class="tiny muted">${r1(w.free)} free</div></td>
     <td><span class="pill ${k==='push'?'warn':k==='hold'?'grey':'good'}">${t}</span><div class="tiny muted" style="margin-top:3px">${d}</div>
@@ -608,12 +773,12 @@ async function viewJob(el){
    <div class="muted">${esc([j.address,j.suburb].filter(Boolean).join(', '))}</div>${j.title?`<div class="small" style="margin-top:4px">${esc(j.title)}</div>`:''}
    <div class="small" style="margin-top:6px">${j.clients?.phone?`<a href="tel:${esc(j.clients.phone)}" style="color:var(--green-2)">${esc(j.clients.phone)}</a> `:''}${j.clients?.email?`<a href="mailto:${esc(j.clients.email)}" style="color:var(--green-2)">${esc(j.clients.email)}</a>`:''}</div>
    ${stageBar(j.stage)}</div>
-
+  ${timingCard(j)}
   <div class="kpis">
    <div class="kpi"><div class="eyebrow">Quote ex GST</div><div class="v">${money(n.quoteEx)}</div><div class="s">${j.quote_total?money(j.quote_total)+' inc GST':'Not priced yet'}</div></div>
    <div class="kpi"><div class="eyebrow">Crew days</div><div class="v">${r1(n.actualDays)}<span class="small muted"> / ${r1(n.qDays)}</span></div><div class="s">Worked / quoted${n.varDays?`. ${r1(n.varDays)} were variations`:''}</div></div>
    <div class="kpi ${n.lostDollars>0?'alert':''}"><div class="eyebrow">Labour over quote</div><div class="v">${money(n.lostDollars)}</div><div class="s">${n.overrun!=null?pct(n.overrun)+' over on quoted scope':'Log crew days to see this'}</div></div>
-   <div class="kpi"><div class="eyebrow">Earned per crew day</div><div class="v">${n.perDay?money(n.perDay):'–'}</div><div class="s">Quote ex GST over days worked</div></div>
+   <div class="kpi"><div class="eyebrow">Job profit</div><div class="v" style="color:${n.profit==null?'inherit':n.profit<0?'var(--bad)':'var(--good)'}">${n.profit==null?'–':money(n.profit)}</div><div class="s">${n.profit==null?(n.actualDays?'Add crew cost per day in Rates':'Log crew days to see this'):`${pct(n.margin)} margin · less ${n.matsSource}`}</div></div>
   </div>
 
   <div class="card"><div class="row between"><h2>Crew log</h2><span class="small muted">${r1(n.actualDays)} crew days · ${money(n.actualCharge)}</span></div>
@@ -652,6 +817,7 @@ async function viewJob(el){
   ${j.notes?`<div class="card"><h3>Notes</h3><p class="small muted" style="margin:6px 0 0;white-space:pre-wrap">${esc(j.notes)}</p></div>`:''}`;
 
   $('#back').onclick=()=>go('jobs');
+  bindTiming(el,j);
   el.querySelectorAll('[data-stage]').forEach(b=>b.onclick=()=>setStage(j,b.dataset.stage,ts));
   $('#lost')&&($('#lost').onclick=()=>setStage(j,'Lost',ts));
   let len=8;el.querySelectorAll('#len button').forEach(b=>b.onclick=()=>{el.querySelectorAll('#len button').forEach(x=>x.classList.toggle('on',x===b));$('#lh').classList.toggle('hidden',b.dataset.h!=='x');len=b.dataset.h});
@@ -671,6 +837,32 @@ async function viewJob(el){
   $('#copy').onclick=()=>navigator.clipboard?.writeText($('#xero').textContent).then(()=>toast('Copied. Paste into Xero.'));
   if((att||[]).length){const urls=await Promise.all(att.map(a=>sb.storage.from('job-files').createSignedUrl(a.path,3600)));$('#atts').innerHTML=urls.map(u=>u.data?`<a href="${u.data.signedUrl}" target="_blank"><img src="${u.data.signedUrl}"></a>`:'').join('')}
 }
+function timingCard(j){
+  const r=replyStatus(j),q=quoteStatus(j),p=promiseOf(j),e=j.enquiry||null;
+  const open=OPEN.includes(j.stage)&&j.stage!=='On site';
+  if(!e&&!r&&!q&&!p&&!open)return '';
+  const line=(lvl,t)=>`<div class="row" style="gap:8px;margin:6px 0"><span class="pill ${lvl}">${lvl==='bad'?'Late':lvl==='warn'?'Due':lvl==='good'?'On track':'Info'}</span><span class="small">${t}</span></div>`;
+  const pl={late:'bad',soon:'warn',booked:'good',ok:'grey'};
+  return `<div class="card"><div class="row between"><h2>Timing</h2>${j.stage==='Lead'&&!j.contacted_at&&S.dbReady?`<button class="btn sm" id="contacted">Mark contacted</button>`:''}</div>
+   ${r?line(r.late?'bad':r.left===0?'warn':'grey',`Reply by ${fmtD(iso(r.due))}`):j.contacted_at&&['Lead','Design'].includes(j.stage)?line('good',`Contacted ${fmtShort(String(j.contacted_at).slice(0,10))}`):''}
+   ${q?line(q.late?'bad':q.soon?'warn':'grey',`Quote due ${fmtD(iso(q.due))}, ${S.settings.quote_due_days??7} days from ${j.stage==='Design'?'the design':'the enquiry'}`):''}
+   ${p&&p.state!=='done'?line(pl[p.state],`Told the client ${p.label} on ${fmtShort(j.promised_on)}. ${p.msg}`):''}
+   ${open?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid #f1ede3"><b class="small">What Greg told the client</b>
+    <div class="row" style="gap:8px;align-items:flex-end;flex-wrap:wrap">
+     <div style="width:84px"><label for="pw1">From</label><input id="pw1" inputmode="numeric" value="${j.promised_weeks_min??''}" placeholder="8"></div>
+     <div style="width:84px"><label for="pw2">To</label><input id="pw2" inputmode="numeric" value="${j.promised_weeks_max??''}" placeholder="10"></div>
+     <span class="small muted" style="padding-bottom:12px">weeks</span>
+     <div style="flex:1;min-width:150px"><label for="pon">Said on</label><input id="pon" type="date" value="${j.promised_on||iso(today0())}"></div>
+     <button class="btn light sm" id="psave" style="margin-bottom:4px">Save</button></div></div>`:''}
+   ${e?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid #f1ede3"><b class="small">From the website</b>
+    <div class="small muted" style="margin-top:4px;line-height:1.6">${[(e.project_types||[]).join(', '),e.budget&&'Budget '+e.budget,e.start_pref&&'Start '+e.start_pref,e.contact_pref&&'Prefers '+e.contact_pref,e.enquiring_as,j.lead_source&&'Found us via '+j.lead_source].filter(Boolean).map(esc).join(' · ')}</div></div>`:''}
+  </div>`}
+function bindTiming(el,j){
+  $('#contacted')&&($('#contacted').onclick=async()=>{const {error}=await sb.from('jobs').update({contacted_at:new Date().toISOString()}).eq('id',j.id);if(error)return toast(error.message);await loadAll();toast('Marked contacted');render()});
+  $('#psave')&&($('#psave').onclick=async()=>{const a=+$('#pw1').value||null,b=+$('#pw2').value||a;if(!a&&$('#pw1').value!=='')return toast('Add the weeks');
+    const {error}=await sb.from('jobs').update({promised_weeks_min:a,promised_weeks_max:a?Math.max(a,b):null,promised_on:a?$('#pon').value:null}).eq('id',j.id);
+    if(error)return toast(S.dbReady?error.message:'Needs the database update first');await loadAll();toast(a?'Promise saved. It shows on the board.':'Promise cleared');render()});
+}
 function xeroLines(j,ts){const rate=+S.settings.labour_rate||0;const lines=[`${j.clients?.name||''} · ${[j.address,j.suburb].filter(Boolean).join(', ')}`,j.title||'',''];let sub=0;
   for(const t of ts){const price=t.sell_price??(rate&&t.est_hours?(+t.est_hours)*rate:null);if(price)sub+=+price;
     lines.push(`${t.task_type}${t.description?' · '+t.description:''}${t.qty?` (${t.qty} ${t.unit||''})`:''}  ${price?money(price,2):'price TBC'}`)}
@@ -689,6 +881,10 @@ async function viewRates(el){
   <div class="card"><h2>Day rate</h2><div class="split"><div><label>Labour $/hr ex GST</label><input id="lr" inputmode="decimal" value="${S.settings.labour_rate??''}"></div><div><label>Hours per day</label><input id="hpd" inputmode="decimal" value="${S.settings.hours_per_day??8}"></div></div>
    <label>Usual crew per job</label><input id="dc" inputmode="numeric" value="${S.settings.default_crew??2}"><p class="small muted" style="margin:8px 0 0">${money(DAY_RATE())} per crew day.</p>
    <button class="btn light sm" id="ss" style="margin-top:10px">Save</button></div>
+  <div class="card"><h2>Timing alerts</h2><p class="small muted" style="margin:4px 0 0">These drive the alerts on Today.</p>
+   <div class="split"><div><label for="rd">Reply to an enquiry within (days)</label><input id="rd" inputmode="numeric" value="${S.settings.reply_due_days??2}"></div><div><label for="qdd">Quote within (days)</label><input id="qdd" inputmode="numeric" value="${S.settings.quote_due_days??7}"></div></div>
+   <label for="pwd">Warn before a promised start window opens (days)</label><input id="pwd" inputmode="numeric" value="${S.settings.promise_warn_days??14}">
+   <button class="btn light sm" id="ts" style="margin-top:10px">Save</button></div>
   <div class="card"><h2>Crew</h2><p class="small muted" style="margin:4px 0 8px">Charge per day drives the numbers. Add what each person costs Greg to see true margin.</p>
    <table><thead><tr><th>Name</th><th class="num">Charge/day</th><th class="num">Cost/day</th></tr></thead><tbody>
    ${S.crew.map(c=>`<tr><td class="small">${esc(c.name)}</td><td class="num" style="width:100px"><input data-crew="${c.id}" data-k="charge_per_day" value="${c.charge_per_day??''}" inputmode="decimal" style="text-align:right"></td><td class="num" style="width:100px"><input data-crew="${c.id}" data-k="cost_per_day" value="${c.cost_per_day??''}" inputmode="decimal" style="text-align:right" placeholder="?"></td></tr>`).join('')}
@@ -698,6 +894,7 @@ async function viewRates(el){
    </tbody></table></div>
   <div class="card"><h2>What it learned</h2>${(log||[]).length?`<table style="margin-top:6px">${log.map(l=>`<tr><td class="small">${esc(l.task_type)}<div class="tiny muted">est ${r1(l.est_hours)}h, actual ${r1(l.actual_hours)}h</div></td><td class="num small">${l.old_hours_per_unit==null?'new':Math.round(l.old_hours_per_unit*100)/100+' →'} <b>${Math.round(l.new_hours_per_unit*100)/100}</b></td></tr>`).join('')}</table>`:'<p class="small muted">Nothing yet. Finish a job with actual hours on its tasks.</p>'}</div>`;
   $('#back').onclick=()=>go('nums');
+  $('#ts').onclick=async()=>{const p={reply_due_days:+$('#rd').value||2,quote_due_days:+$('#qdd').value||7,promise_warn_days:+$('#pwd').value||14};const {error}=await sb.from('settings').update(p).eq('id',1);if(error)return toast(S.dbReady?error.message:'Needs the database update first');Object.assign(S.settings,p);toast('Saved')};
   $('#ss').onclick=async()=>{const p={labour_rate:+$('#lr').value||null,hours_per_day:+$('#hpd').value||8,default_crew:+$('#dc').value||2};await sb.from('settings').update(p).eq('id',1);Object.assign(S.settings,p);toast('Saved');render()};
   el.querySelectorAll('[data-crew]').forEach(i=>i.onchange=async()=>{await sb.from('crew').update({[i.dataset.k]:i.value===''?null:+i.value}).eq('id',i.dataset.crew);toast('Saved');await loadAll()});
   $('#ncadd').onclick=async()=>{const n=$('#nc').value.trim();if(!n)return;await sb.from('crew').insert({name:n,charge_per_day:DAY_RATE()});await loadAll();render()};

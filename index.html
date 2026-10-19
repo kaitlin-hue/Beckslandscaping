@@ -421,6 +421,36 @@ footer{padding:60px 0 40px;}
 .built-row figcaption{margin-top:8px;font-size:12px;color:rgba(255,255,255,.6);}
 @media(max-width:880px){.built-three{grid-template-columns:1fr 1fr 1fr;gap:8px;}.built-row{grid-template-columns:1fr 1fr;}}
 @media(max-width:560px){.built-three{grid-template-columns:1fr;}.built-three img{aspect-ratio:4/3;}}
+
+/* enquiry form */
+.enq{scroll-margin-top:96px;max-width:760px;margin:34px auto 0;text-align:left;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.16);border-radius:18px;padding:28px;backdrop-filter:blur(6px)}
+.enq h3{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:4px}
+.enq .sub{font-size:14px;color:rgba(255,255,255,.72);line-height:1.5;margin-bottom:18px}
+.enq .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.enq .full{grid-column:1/-1}
+.enq label,.enq legend{display:block;font-size:12px;font-weight:600;letter-spacing:.04em;color:rgba(255,255,255,.82);margin-bottom:6px}
+.enq input,.enq select,.enq textarea{width:100%;font:inherit;font-size:15px;color:var(--ink);background:#fff;border:1.5px solid transparent;border-radius:10px;padding:12px 13px;min-height:46px}
+.enq textarea{min-height:110px;resize:vertical;line-height:1.45}
+.enq input:focus,.enq select:focus,.enq textarea:focus{outline:3px solid rgba(201,169,110,.7);outline-offset:1px}
+.enq fieldset{border:0;padding:0;margin:0}
+.enq .chips{display:flex;flex-wrap:wrap;gap:8px}
+.enq .chip{position:relative}
+.enq .chip input{position:absolute;opacity:0;width:1px;height:1px}
+.enq .chip span{display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border-radius:40px;border:1px solid rgba(255,255,255,.35);font-size:14px;cursor:pointer;color:#fff;line-height:1.2}
+.enq .chip input:checked+span{background:#c9a96e;border-color:#c9a96e;color:var(--ink);font-weight:600}
+.enq .chip input:focus-visible+span{outline:3px solid rgba(201,169,110,.7);outline-offset:2px}
+.enq .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.enq .send{margin-top:18px;display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.enq .send .btn{border:0;cursor:pointer;background:#fff;color:var(--ink);font-family:inherit}
+.enq .send .btn:disabled{opacity:.6;cursor:wait}
+.enq .note{font-size:13px;color:rgba(255,255,255,.7);line-height:1.5}
+.enq .msg{margin-top:14px;font-size:14px;line-height:1.5;border-radius:10px;padding:12px 14px;display:none}
+.enq .msg.err{display:block;background:rgba(180,67,47,.22);border:1px solid rgba(255,180,160,.4)}
+.enq .msg a{text-decoration:underline}
+.enq-done{display:none;text-align:center;padding:20px 6px}
+.enq-done h3{font-size:26px;margin-bottom:8px}
+.enq-done p{color:rgba(255,255,255,.78);font-size:15px;line-height:1.55}
+@media(max-width:620px){.enq{padding:20px 16px}.enq .grid{grid-template-columns:1fr}}
 </style>
 <script type="application/ld+json">
 {
@@ -787,7 +817,7 @@ footer{padding:60px 0 40px;}
           <p>Non-refundable.</p>
         </div>
         <div class="btn-row design-btns">
-          <a href="https://form.jotform.com/260408375301046" target="_blank" rel="noopener" class="btn primary" id="bookDesign">Book your design <span class="arr"><svg class="ico-arr" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="8 7 17 7 17 16"/></svg></span></a>
+          <a href="#enquire" class="btn primary" id="bookDesign" data-type="Landscape design">Book your design <span class="arr"><svg class="ico-arr" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="8 7 17 7 17 16"/></svg></span></a>
         </div>
       </div>
     </div>
@@ -1004,8 +1034,46 @@ footer{padding:60px 0 40px;}
     <div class="cta-card" id="cta">
       <span class="eyebrow light"><span class="dot"></span>Start a project</span>
       <h2>Complete our project intake form to get started.</h2>
+      <div class="enq" id="enquire">
+        <form id="enqForm" novalidate>
+          <h3>Tell us about your project</h3>
+          <p class="sub">Two minutes. Greg reads every one and gets back to you within two business days.</p>
+          <div class="grid">
+            <div><label for="eqName">Your name *</label><input id="eqName" name="name" autocomplete="name" required></div>
+            <div><label for="eqPhone">Mobile *</label><input id="eqPhone" name="phone" type="tel" autocomplete="tel" inputmode="tel" required></div>
+            <div><label for="eqEmail">Email *</label><input id="eqEmail" name="email" type="email" autocomplete="email" required></div>
+            <div><label for="eqAs">Enquiring as</label><select id="eqAs" name="enquiring_as"><option>Homeowner</option><option>Builder or trade</option></select></div>
+            <div><label for="eqAddr">Street address</label><input id="eqAddr" name="address" autocomplete="street-address" placeholder="Only Greg sees this"></div>
+            <div><label for="eqSub">Suburb *</label><input id="eqSub" name="suburb" autocomplete="address-level2" required></div>
+            <fieldset class="full"><legend>What are you after? *</legend><div class="chips">
+              <label class="chip"><input type="checkbox" name="project_types" value="Landscape design"><span>Landscape design $990</span></label>
+              <label class="chip"><input type="checkbox" name="project_types" value="Full landscaping"><span>Full landscaping</span></label>
+              <label class="chip"><input type="checkbox" name="project_types" value="Front yard"><span>Front yard</span></label>
+              <label class="chip"><input type="checkbox" name="project_types" value="Backyard"><span>Backyard</span></label>
+              <label class="chip"><input type="checkbox" name="project_types" value="Pool surrounds"><span>Pool surrounds</span></label>
+              <label class="chip"><input type="checkbox" name="project_types" value="Retaining"><span>Retaining</span></label>
+              <label class="chip"><input type="checkbox" name="project_types" value="Paving"><span>Paving</span></label>
+              <label class="chip"><input type="checkbox" name="project_types" value="Decking"><span>Decking</span></label>
+              <label class="chip"><input type="checkbox" name="project_types" value="Turf"><span>Turf</span></label>
+              <label class="chip"><input type="checkbox" name="project_types" value="Garden beds and planting"><span>Garden beds and planting</span></label>
+              <label class="chip"><input type="checkbox" name="project_types" value="Irrigation"><span>Irrigation</span></label>
+              <label class="chip"><input type="checkbox" name="project_types" value="Lighting"><span>Lighting</span></label>
+              <label class="chip"><input type="checkbox" name="project_types" value="Other"><span>Other</span></label>
+            </div></fieldset>
+            <div class="full"><label for="eqDesc">Tell us about the space and what you'd love *</label><textarea id="eqDesc" name="description" required></textarea></div>
+            <div><label for="eqBudget">Rough budget</label><select id="eqBudget" name="budget"><option value="">Not sure yet</option><option>Under $10,000</option><option>$10,000 to $25,000</option><option>$25,000 to $50,000</option><option>$50,000 to $100,000</option><option>Over $100,000</option></select></div>
+            <div><label for="eqStart">When would you like to start?</label><select id="eqStart" name="start_pref"><option>As soon as possible</option><option>In 1 to 3 months</option><option>In 3 to 6 months</option><option>6 months or more</option><option>Just exploring</option></select></div>
+            <div><label for="eqContact">Best way to reach you</label><select id="eqContact" name="contact_pref"><option>Phone</option><option>SMS</option><option>Email</option></select></div>
+            <div><label for="eqSrc">How did you find us?</label><select id="eqSrc" name="source"><option value="">Choose one</option><option>Google</option><option>Instagram</option><option>Facebook</option><option>Friend or family</option><option>Referral</option><option>Saw a job or drove past</option><option>Repeat client</option><option>Event</option><option>Other</option></select></div>
+            <div class="hp" aria-hidden="true"><label for="eqWeb">Leave this empty</label><input id="eqWeb" name="website" tabindex="-1" autocomplete="off"></div>
+          </div>
+          <div class="send"><button class="btn primary" type="submit" id="eqSend">Send to Greg</button><span class="note">Or call Greg on <a href="tel:+61438456320">0438 456 320</a></span></div>
+          <div class="msg" id="eqMsg" role="alert"></div>
+        </form>
+        <div class="enq-done" id="enqDone" tabindex="-1"><h3>Thanks, it's with Greg.</h3><p>He'll be in touch within two business days. If it's urgent, call him on <a href="tel:+61438456320">0438 456 320</a>.</p></div>
+      </div>
       <div class="btn-row">
-        <a href="https://form.jotform.com/260408375301046" target="_blank" rel="noopener" class="btn primary">Start your project <span class="arr"><svg class="ico-arr" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="8 7 17 7 17 16"/></svg></span></a>
+        <a href="#enquire" class="btn primary">Start your project <span class="arr"><svg class="ico-arr" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="8 7 17 7 17 16"/></svg></span></a>
         <a href="tel:+61438456320" class="btn ghost">Call Greg, 0438 456 320</a>
         <a href="mailto:contact@beckslandscaping.com.au" class="btn ghost">Email contact@beckslandscaping.com.au</a>
       </div>
@@ -1220,5 +1288,31 @@ document.querySelectorAll('.built-tab').forEach(t=>t.addEventListener('click',()
   <svg viewBox="0 0 32 32" fill="#fff" xmlns="http://www.w3.org/2000/svg"><path d="M16.02 3C9.4 3 4 8.4 4 15.02c0 2.35.65 4.55 1.78 6.43L4 29l7.7-1.75a12.9 12.9 0 0 0 4.32.75h.01c6.63 0 12.02-5.4 12.02-12.02C28.05 8.4 22.65 3 16.02 3zm0 21.9h-.01a10 10 0 0 1-4.8-1.23l-.34-.2-3.5.8.84-3.43-.22-.35a9.9 9.9 0 0 1-1.53-5.47c0-5.5 4.48-9.98 9.98-9.98 2.66 0 5.16 1.04 7.04 2.93a9.9 9.9 0 0 1 2.92 7.05c0 5.5-4.48 9.88-9.38 9.88zm5.46-7.4c-.3-.15-1.77-.87-2.04-.97-.28-.1-.48-.15-.68.15-.2.3-.78.97-.96 1.17-.18.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.47-.89-.79-1.48-1.76-1.66-2.06-.17-.3-.02-.46.13-.61.14-.14.3-.35.45-.53.15-.18.2-.3.3-.5.1-.2.05-.38-.02-.53-.08-.15-.68-1.64-.93-2.24-.25-.6-.5-.5-.68-.51h-.58c-.2 0-.53.07-.8.38-.28.3-1.05 1.03-1.05 2.5 0 1.48 1.08 2.9 1.23 3.1.15.2 2.12 3.24 5.14 4.54.72.31 1.28.5 1.72.63.72.23 1.38.2 1.9.12.58-.09 1.77-.72 2.02-1.42.25-.7.25-1.29.17-1.42-.07-.13-.27-.2-.57-.35z"/></svg>
 </a>
 
+<script>
+(function(){
+  var f=document.getElementById('enqForm');if(!f)return;
+  var t0=Date.now(),msg=document.getElementById('eqMsg'),btn=document.getElementById('eqSend');
+  var URL='https://nwpperddaojaafsyuqyx.supabase.co/rest/v1/rpc/submit_enquiry',KEY='sb_publishable_cONDiKoAkuwQQMv9x8zVag_M-Xd2Wa6';
+  var JF='https://form.jotform.com/260408375301046';
+  document.querySelectorAll('a[href="#enquire"][data-type]').forEach(function(a){a.addEventListener('click',function(){
+    var box=f.querySelector('input[name="project_types"][value="'+a.dataset.type+'"]');if(box)box.checked=true;});});
+  function fail(text){msg.className='msg err';msg.innerHTML=text+' You can also use <a href="'+JF+'" target="_blank" rel="noopener">our intake form</a> or call Greg on <a href="tel:+61438456320">0438 456 320</a>.';btn.disabled=false;btn.textContent='Send to Greg'}
+  f.addEventListener('submit',function(e){
+    e.preventDefault();msg.className='msg';
+    var d={};['name','phone','email','address','suburb','description','budget','start_pref','contact_pref','source','enquiring_as','website'].forEach(function(k){var el=f.elements[k];d[k]=el?String(el.value||'').trim():''});
+    d.project_types=[].map.call(f.querySelectorAll('input[name="project_types"]:checked'),function(i){return i.value});
+    d.elapsed_ms=Date.now()-t0;
+    var missing=[];if(!d.name)missing.push('name');if(!d.phone)missing.push('mobile');if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.email))missing.push('email');if(!d.suburb)missing.push('suburb');if(!d.project_types.length)missing.push('what you are after');if(!d.description)missing.push('a few words about the project');
+    if(missing.length){msg.className='msg err';msg.textContent='Please add your '+missing.join(', ')+'.';return}
+    btn.disabled=true;btn.textContent='Sending';
+    fetch(URL,{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY},body:JSON.stringify({p:d})})
+      .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})})
+      .then(function(r){if(!r.ok)return fail((r.j&&r.j.message&&r.j.code==='P0001')?r.j.message:'That didn\'t send.');
+        f.style.display='none';var done=document.getElementById('enqDone');done.style.display='block';done.focus();
+        if(window.gtag)gtag('event','generate_lead');if(window.fbq)fbq('track','Lead');})
+      .catch(function(){fail('That didn\'t send.')});
+  });
+})();
+</script>
 </body>
 </html>
