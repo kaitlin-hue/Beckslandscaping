@@ -8,6 +8,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Beck's Hub">
 <title>Beck's Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
   --ink:#15140f;--charcoal:#2b2f2a;--green:#3d5457;--green-2:#2c3d40;--green-l:#a9bcbe;--green-xl:#e3eaeb;
@@ -15,7 +18,7 @@
   --good:#3f7a4f;--warn:#b7791f;--bad:#b4432f;--r:14px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+html,body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.45 Manrope,-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
 h1,h2,h3{margin:0;letter-spacing:-.02em}
 h1{font-size:24px;font-weight:700}h2{font-size:17px;font-weight:700}h3{font-size:15px;font-weight:600}
 .serif{font-family:Georgia,"Times New Roman",serif;font-weight:400}
@@ -118,6 +121,55 @@ td input{padding:6px 8px;font-size:13px}
 .login{min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(180deg,rgba(44,61,64,.82),rgba(21,20,15,.92)),url('https://nwpperddaojaafsyuqyx.supabase.co/storage/v1/object/public/site/burwood/render.webp') center/cover}
 .login .card{max-width:380px;width:100%}
 .hidden{display:none!important}
+
+/* ---------- today ---------- */
+.today-head{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px;margin:18px 0 4px}
+.today-head h1{font-size:26px;margin-top:4px}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:14px 0}
+@media(min-width:900px){.tiles{grid-template-columns:repeat(4,1fr);gap:14px}}
+.tile{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px;display:flex;flex-direction:column}
+.tile.dark{background:var(--green-2);border-color:var(--green-2);color:#fff}
+.tile.dark .eyebrow{color:var(--sand)}.tile.dark .s,.tile.dark .src{color:#c9d3d2}
+.tile .v{font-family:Georgia,serif;font-size:32px;line-height:1.1;margin-top:8px}
+.tile .v.bad{color:var(--bad)}
+.tile .s{font-size:13px;color:var(--mut);margin-top:4px;line-height:1.35}
+.tile .src{font-size:11px;color:var(--mut);margin-top:auto;padding-top:12px}
+.meter{height:8px;border-radius:5px;background:#efe9dd;overflow:hidden;margin-top:12px}
+.meter i{display:block;height:100%;background:var(--green-2)}
+.today-grid{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:900px){.today-grid{grid-template-columns:1fr 1fr;gap:14px}.today-grid .card{margin:0}}
+.need{display:flex;gap:12px;align-items:center;width:100%;padding:12px 14px;margin:8px 0;border:0;border-radius:12px;background:#fbf3e6;text-align:left;cursor:pointer;min-height:56px}
+.need:hover{filter:brightness(.98)}
+.need.info{background:var(--green-xl)}.need.bad{background:#f5ddd7}
+.need .dot{width:10px;height:10px;border-radius:50%;flex:none;background:var(--warn)}
+.need.info .dot{background:var(--green)}.need.bad .dot{background:var(--bad)}
+.need .txt{flex:1;min-width:0}.need .txt b{display:block;font-size:14px}.need .txt span{display:block;font-size:13px;color:#5f5b50;margin-top:2px}
+.need .go{font-weight:700;font-size:13px;color:var(--green-2);white-space:nowrap}
+.stg{display:flex;align-items:center;gap:10px;margin:8px 0}
+.stg .n{width:118px;font-size:13px;font-weight:600;flex:none}
+.stg .t{flex:1;height:12px;background:#f1ede3;border-radius:6px;overflow:hidden}
+.stg .t i{display:block;height:100%;border-radius:6px;min-width:0}
+.stg .c{width:34px;text-align:right;font-family:Georgia,serif;font-size:15px;flex:none}
+
+/* ---------- desktop: sidebar layout ---------- */
+nav.tabs .nav-brand,nav.tabs .nav-foot{display:none}
+@media(min-width:1000px){
+  header.top{display:none}
+  .app{max-width:none;margin:0 0 0 248px;padding:12px clamp(24px,4vw,56px) 64px}
+  #main{max-width:1120px}
+  nav.tabs{top:0;bottom:0;right:auto;width:248px;flex-direction:column;justify-content:flex-start;gap:4px;background:var(--green-2);border-top:0;padding:28px 16px}
+  nav.tabs button{flex-direction:row;justify-content:flex-start;gap:12px;width:100%;min-height:44px;padding:0 14px;border-radius:10px;font-size:15px;font-weight:600;color:#c9d3d2}
+  nav.tabs button:hover{background:var(--green);color:#fff}
+  nav.tabs button.on{background:var(--paper);color:var(--ink);font-weight:700}
+  nav.tabs svg{width:18px;height:18px}
+  nav.tabs .add{order:90;margin-top:auto;width:100%;min-width:0;height:48px;border-radius:12px;background:var(--sand);color:#1d2a2c;box-shadow:none;justify-content:center;font-weight:700}
+  nav.tabs .add:hover{background:#d6bb87;color:#1d2a2c}
+  nav.tabs .add span{display:inline}
+  nav.tabs .nav-brand{display:flex;order:-1;padding:0 10px 22px}
+  nav.tabs .nav-brand b{color:#fff;font-size:18px}nav.tabs .nav-brand span{color:var(--sand);font-size:11px;letter-spacing:.28em}
+  nav.tabs .nav-foot{display:flex;order:99;min-height:40px;font-size:13px;font-weight:500;color:#9fb0ae;margin-top:8px}
+  .toast{bottom:32px;left:calc(50% + 124px)}
+}
 </style>
 </head>
 <body>
@@ -217,7 +269,7 @@ async function start(){
   const {data}=await sb.from('profiles').select('*').eq('id',S.user.id).maybeSingle();
   S.profile=data||{role:'pending',name:''};
   if(role()==='pending'){$('#root').innerHTML=`<div class="login"><div class="card"><h2>You're in the queue</h2><p class="small muted">Greg or Kaitlin needs to approve ${esc(S.user.email)} before you can see the hub.</p><button class="btn ghost block" id="lo">Log out</button></div></div>`;$('#lo').onclick=()=>sb.auth.signOut();return}
-  S.view=isStaff()?'jobs':'board';
+  S.view=isStaff()?'home':'board';
   $('#root').innerHTML='<div class="spinner" style="margin-top:40vh"></div>';
   await loadAll();render();
 }
@@ -235,6 +287,7 @@ function renderLogin(){
 
 /* ---------- shell ---------- */
 const IC={
+ home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>',
  jobs:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
  board:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h9M6 12h12M10 18h11"/></svg>',
  add:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>',
@@ -244,21 +297,81 @@ const IC={
 };
 function go(v,id){S.view=v;if(id!==undefined)S.jobId=id;render();scrollTo(0,0)}
 function render(){
-  const tabs=isStaff()?[['jobs','Jobs',IC.jobs],['board','Board',IC.board],['add','',IC.add],['nums','Numbers',IC.nums],['mkt','Marketing',IC.mkt]]
+  const tabs=isStaff()?[['home','Today',IC.home],['jobs','Jobs',IC.jobs],['board','Board',IC.board],['add','Log a day or job',IC.add],['nums','Numbers',IC.nums],['mkt','Marketing',IC.mkt]]
     :isMkt()?[['board','Board',IC.board],['mkt','Marketing',IC.mkt]]:[['board','Board',IC.board]];
   const allowed=new Set(tabs.map(t=>t[0]).concat(isStaff()?['job','review','rates','me']:['me']));
   const v=allowed.has(S.view)?S.view:tabs[0][0];
   const cur=v==='job'||v==='review'?'jobs':v;
   $('#root').innerHTML=`<div class="app"><header class="top"><div class="brand"><b>BECK'S</b><span>LANDSCAPING HUB</span></div><button class="who" id="me">${esc(S.profile.name||'Me')}</button></header><main id="main"></main></div>
-  <nav class="tabs">${tabs.map(([k,l,ic])=>`<button data-v="${k}" class="${k==='add'?'add':''} ${cur===k?'on':''}" aria-label="${l||'New job'}">${ic}<span>${l}</span></button>`).join('')}</nav>`;
-  document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>go(b.dataset.v));
-  $('#me').onclick=()=>go('me');
-  ({jobs:viewJobs,board:viewBoard,add:viewAdd,review:viewReview,job:viewJob,nums:viewNumbers,mkt:viewMarketing,rates:viewRates,me:viewMe})[v]($('#main'));
+  <nav class="tabs" aria-label="Main"><div class="brand nav-brand"><b>BECK'S</b><span>LANDSCAPING HUB</span></div>${tabs.map(([k,l,ic])=>`<button data-v="${k}" class="${k==='add'?'add':''} ${cur===k?'on':''}" aria-label="${l}">${ic}<span>${l}</span></button>`).join('')}<button class="nav-foot" id="me2">${esc(S.profile.name||'Me')} · ${esc(role())}</button></nav>`;
+  document.querySelectorAll('nav.tabs button[data-v]').forEach(b=>b.onclick=()=>go(b.dataset.v));
+  $('#me').onclick=()=>go('me');$('#me2').onclick=()=>go('me');
+  ({home:viewToday,jobs:viewJobs,board:viewBoard,add:viewAdd,review:viewReview,job:viewJob,nums:viewNumbers,mkt:viewMarketing,rates:viewRates,me:viewMe})[v]($('#main'));
 }
 function stageBar(stage){const i=STAGES.indexOf(stage);return `<div class="stagebar">${STAGES.map((_,k)=>`<i class="${k<=i?'on':''}"></i>`).join('')}</div>`}
 function stagePill(s){const c=s==='Lost'?'bad':PENCIL.includes(s)?'warn':['Paid'].includes(s)?'grey':['Complete','Invoiced'].includes(s)?'good':'';return `<span class="pill ${c}">${esc(s)}</span>`}
 
 /* ---------- jobs ---------- */
+/* ---------- today (owner and admin only) ---------- */
+function viewToday(el){
+  const t0=today0(),now=new Date();
+  const all=jobNumbers(),finished=all.filter(n=>n.actualDays>0);
+  const lost=finished.reduce((a,n)=>a+n.lostDollars,0),lostDays=finished.reduce((a,n)=>a+n.lostDays,0);
+  const perDay=finished.filter(n=>n.perDay);
+  const avgPerDay=perDay.length?perDay.reduce((a,n)=>a+n.quoteEx,0)/perDay.reduce((a,n)=>a+n.actualDays,0):NaN;
+  const chase=S.jobs.filter(j=>['Complete','Invoiced'].includes(j.stage));
+  const owed=chase.reduce((a,j)=>a+(+j.invoiced_total||+j.quote_total||0),0);
+  const oldest=[...chase].sort((a,b)=>String(a.closed_at||a.quote_date||a.created_at||'').localeCompare(String(b.closed_at||b.quote_date||b.created_at||'')));
+  const wks=weeksAhead(8),cap=wks.reduce((a,w)=>a+w.cap,0),bookedD=wks.reduce((a,w)=>a+w.booked,0),free=wks.reduce((a,w)=>a+w.free,0);
+  const nfs=nextFreeStart();
+  const unlogged=S.jobs.filter(j=>['Complete','Invoiced','Paid'].includes(j.stage)&&!daysFor(j.id).length);
+  const noDates=S.jobs.filter(j=>BOOKED.includes(j.stage)&&!j.start_date);
+  const weekAgo=iso(new Date(t0.getTime()-7*864e5));
+  const staleQuotes=S.jobs.filter(j=>j.stage==='Quoted'&&String(j.quote_date||j.created_at||'').slice(0,10)<=weekAgo);
+  const leads=S.jobs.filter(j=>j.stage==='Lead');
+  const names=(js,n=3)=>js.slice(0,n).map(j=>esc(j.clients?.name||j.suburb||'No name')).join(', ')+(js.length>n?` and ${js.length-n} more`:'');
+  const plural=(n,a,b)=>n===1?a:b;
+
+  const needs=[];
+  if(noDates.length)needs.push(['bad',`${noDates.length} booked ${plural(noDates.length,'job has','jobs have')} no start date`,`Not on the board yet. ${names(noDates)}`,'jobs','Open']);
+  if(chase.length)needs.push(['warn',`Chase ${chase.length} ${plural(chase.length,'invoice','invoices')} · ${money(owed)}`,`Oldest first. ${names(oldest)}`,'jobs','Open']);
+  if(staleQuotes.length)needs.push(['warn',`${staleQuotes.length} ${plural(staleQuotes.length,'quote','quotes')} out over a week`,`Follow up. ${names(staleQuotes)}`,'jobs','Open']);
+  if(leads.length)needs.push(['info',`${leads.length} new ${plural(leads.length,'enquiry','enquiries')}`,`Book the design. ${names(leads)}`,'jobs','Open']);
+  if(unlogged.length)needs.push(['warn',`${unlogged.length} finished ${plural(unlogged.length,'job has','jobs have')} no crew log`,'Labour figures only count jobs with logged days','nums','Log']);
+  if(cap&&free/cap>.4)needs.push(['info',`Board has room from ${fmtD(iso(nfs))}`,`${Math.round(free)} crew days free over 8 weeks. Push the $990 design.`,'mkt','Plan']);
+
+  const stageRows=STAGES.concat(['Lost']).map(s=>({s,n:S.jobs.filter(j=>j.stage===s).length}));
+  const maxN=Math.max(1,...stageRows.map(r=>r.n));
+  const stageColour=s=>s==='Lost'?'var(--bad)':PENCIL.includes(s)?'var(--sand)':['Complete','Invoiced'].includes(s)?'var(--warn)':s==='Paid'?'var(--green-2)':'var(--green)';
+  const live=S.jobs.filter(j=>j.start_date&&j.end_date&&!['Lost','Paid'].includes(j.stage));
+  const hello=now.getHours()<12?'Good morning':now.getHours()<17?'Good afternoon':'Good evening';
+  const firstName=(S.profile.name||'').split(' ')[0];
+  const logged=`Based on ${finished.length} ${plural(finished.length,'job','jobs')} with a crew log`;
+
+  el.innerHTML=`<div class="today-head"><div><div class="eyebrow">${t0.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'})}</div>
+   <h1>${hello}${firstName?', '+esc(firstName):''}</h1></div></div>
+  <div class="tiles">
+   <div class="tile dark"><div class="eyebrow">To invoice or chase</div><div class="v">${money(owed)}</div>
+    <div class="s">${chase.length} finished ${plural(chase.length,'job','jobs')}, not paid</div><div class="src">Jobs at Complete or Invoiced</div></div>
+   <div class="tile"><div class="eyebrow">Crew days free</div><div class="v">${Math.round(free)}</div>
+    <div class="s">Next 8 weeks${isFinite(free/avgJobCrewDays())?` · about ${Math.max(0,Math.floor(free/avgJobCrewDays()))} jobs of room`:''}</div>
+    <div class="meter" role="img" aria-label="${r1(bookedD)} of ${cap} crew days booked"><i style="width:${cap?Math.min(100,bookedD/cap*100):0}%"></i></div>
+    <div class="src">${r1(bookedD)} of ${cap} booked · from the board</div></div>
+   <div class="tile"><div class="eyebrow">Labour given away</div><div class="v ${lost>0?'bad':''}">${money(lost)}</div>
+    <div class="s">${r1(lostDays)} crew days past quote</div><div class="src">${logged}</div></div>
+   <div class="tile"><div class="eyebrow">Earned per crew day</div><div class="v">${isFinite(avgPerDay)?money(avgPerDay):'–'}</div>
+    <div class="s">Charged at ${money(DAY_RATE())} a crew day</div><div class="src">${logged}</div></div>
+  </div>
+  <div class="today-grid">
+   <div class="card"><h2>Needs you</h2>
+    ${needs.length?needs.map(([k,t,s,v,b])=>`<button class="need ${k==='warn'?'':k}" data-go="${v}"><span class="dot"></span><span class="txt"><b>${t}</b><span>${s}</span></span><span class="go">${b}</span></button>`).join(''):'<p class="small muted" style="margin:10px 0 0">Nothing needs you today.</p>'}</div>
+   <div class="card"><div class="row between"><h2>Where every job sits</h2><span class="small muted">${S.jobs.length} jobs</span></div>
+    <div style="margin-top:8px">${stageRows.map(r=>`<div class="stg"><span class="n">${esc(r.s)}</span><span class="t"><i style="width:${r.n/maxN*100}%;background:${stageColour(r.s)}"></i></span><span class="c">${r.n}</span></div>`).join('')}</div></div>
+  </div>
+  <div class="card"><div class="row between"><h2>This week on site</h2><button class="btn light sm" data-go="board">Board</button></div>${weekList(live,monday(t0))}</div>`;
+  el.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
+}
+
 function viewJobs(el){
   const groups=[['Leads and designs',['Lead','Design']],['Quotes out',['Quoted']],['Booked and on site',BOOKED],['To invoice or chase',['Complete','Invoiced']],['Paid',['Paid']],['Lost',['Lost']]];
   el.innerHTML=`<div class="row between" style="margin:18px 0 6px"><h1>Jobs</h1><button class="btn sm" id="nj">+ New job</button></div>
@@ -366,7 +479,7 @@ function daysChart(list){
 /* ---------- marketing ---------- */
 async function viewMarketing(el){
   const wks=weeksAhead(8);
-  const status=w=>{const f=w.cap?(w.booked+w.pencil)/w.cap:1;return f<.6?['push','Push the design offer','Spare crew days. Run lead ads and design posts.']:f<.9?['steady','Steady','Mix of brand and design content.']:['hold','Full. Brand only','No lead ads. Show finished work and the crew.']};
+  const status=w=>{const f=w.cap?(w.booked+w.pencil)/w.cap:1;return f<.6?['push','Push the design offer','Spare crew days. Run lead ads and design posts.']:f<.9?['steady','On track','Mix of brand and design content.']:['hold','Full. Brand only','No lead ads. Show finished work and the crew.']};
   const ready=S.jobs.filter(j=>['On site','Complete','Invoiced','Paid'].includes(j.stage));
   el.innerHTML=`<div class="row between" style="margin:18px 0 6px"><h1>Marketing</h1><span class="small muted">Runs off the board</span></div>
   <p class="small muted" style="margin:0 0 6px">When the board has room, push the $990 design. When it's full, show the work. Suburbs only, never street names.</p>
