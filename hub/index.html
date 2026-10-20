@@ -154,6 +154,24 @@ td input{padding:6px 8px;font-size:13px}
 .stg .t i{display:block;height:100%;border-radius:6px;min-width:0}
 .stg .c{width:34px;text-align:right;font-family:Georgia,serif;font-size:15px;flex:none}
 
+/* ---------- talk into any box, day log, toolbox ---------- */
+.micwrap{position:relative;display:block}
+.micwrap textarea,.micwrap input{padding-right:52px}
+.minimic{position:absolute;right:6px;top:6px;width:40px;height:40px;border-radius:50%;border:0;background:var(--green-xl);color:var(--green-2);display:grid;place-items:center;cursor:pointer}
+.minimic svg{width:20px;height:20px}
+.minimic.live{background:var(--bad);color:#fff;animation:pulse 1.2s infinite}
+.dayrow{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:12px 0;border-bottom:1px solid #f1ede3}
+.dayrow label{margin-top:0}
+.dayrow .f-name{grid-column:span 2}.dayrow .f-job{grid-column:span 4}
+.dayrow .f-t,.dayrow .f-h{grid-column:span 2}
+.dayrow .f-x{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center}
+.chk{display:flex!important;gap:8px;align-items:center;font-weight:500;color:var(--ink)!important;margin:0!important}
+.chk input{width:auto}
+@media(min-width:900px){.dayrow{grid-template-columns:1.2fr 2fr .8fr .8fr .6fr 1.1fr;align-items:end}.dayrow>div{grid-column:auto!important}.dayrow .f-x{flex-direction:column;align-items:flex-start;gap:6px}}
+.issrow{padding:12px 0;border-bottom:1px solid #f1ede3}
+.tb-item{border-left:3px solid var(--warn);padding:10px 0 10px 12px;margin:8px 0}
+.tb-item.discussed{border-color:var(--green)}.tb-item.sorted{border-color:var(--good);opacity:.7}
+
 /* ---------- desktop: sidebar layout ---------- */
 nav.tabs .nav-brand,nav.tabs .nav-foot,nav.tabs button.desk{display:none}
 @media(min-width:1000px){
@@ -188,7 +206,7 @@ const sb = supabase.createClient("https://nwpperddaojaafsyuqyx.supabase.co","sb_
 const STAGES=['Lead','Design','Quoted','Accepted','Deposit in','Materials ordered','On site','Complete','Invoiced','Paid'];
 const BOOKED=['Accepted','Deposit in','Materials ordered','On site'];
 const PENCIL=['Lead','Design','Quoted'];
-const S={user:null,profile:null,view:'jobs',jobs:[],tasks:[],rates:[],settings:{},crew:[],crewDays:[],costs:[],camps:[],cps:[],leads:[],finSet:null,finUntil:0,dbReady:false,draft:null,jobId:null};
+const S={user:null,profile:null,view:'jobs',jobs:[],tasks:[],rates:[],settings:{},crew:[],crewDays:[],costs:[],camps:[],cps:[],leads:[],issues:[],addMode:'day',dayDraft:null,finSet:null,finUntil:0,dbReady:false,draft:null,jobId:null};
 const $=(s,el=document)=>el.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=(n,dp=0)=>n==null||isNaN(n)?'–':(n<0?'-':'')+'$'+Math.abs(+n).toLocaleString('en-AU',{minimumFractionDigits:dp,maximumFractionDigits:dp});
@@ -241,6 +259,7 @@ async function loadAll(){
     q.rates=sb.from('rates').select('*').order('task_type');q.crewDays=sb.from('crew_days').select('*').order('work_date');q.costs=sb.from('job_costs').select('*');
     q.cps=sb.from('checkpoints').select('job_id,stage,done_at').order('done_at');
     q.finSet=sb.rpc('finance_password_set');
+    q.issues=sb.from('issues').select('*').order('created_at',{ascending:false}).limit(300);
   }else{
     // crew and marketing: board data with no money. Falls back to the tables until the database update has run.
     q.jobs=sb.rpc('board_jobs');q.tasks=sb.rpc('board_tasks');
@@ -251,6 +270,7 @@ async function loadAll(){
     if(r.error&&(k==='jobs'||k==='tasks')&&!isStaff()){const f=k==='jobs'?await sb.from('jobs').select('id,stage,suburb,title,start_date,end_date,crew_size,created_at').order('created_at',{ascending:false}):await sb.from('job_tasks').select('id,job_id,seq,task_type,est_hours,crew_size,start_date,end_date').order('seq');S[k]=f.data||[];continue}
     if(k==='finSet'){S.finSet=r.error?null:!!r.data;continue}
     if(k==='leads'&&r.error){S.leads=null;continue}
+    if(k==='issues'&&r.error){S.issues=null;continue}
     S[k]=r.data||(k==='settings'?{}:[]);
   }
   S.dbReady=isStaff()?S.finSet!==null:true;
@@ -346,7 +366,7 @@ async function start(){
   const {data}=await sb.from('profiles').select('*').eq('id',S.user.id).maybeSingle();
   S.profile=data||{role:'pending',name:''};
   if(role()==='pending'){$('#root').innerHTML=`<div class="login"><div class="card"><h2>You're in the queue</h2><p class="small muted">Greg or Kaitlin needs to approve ${esc(S.user.email)} before you can see the hub.</p><button class="btn ghost block" id="lo">Log out</button></div></div>`;$('#lo').onclick=()=>sb.auth.signOut();return}
-  S.view=isStaff()?'home':'board';
+  S.view=isStaff()?'home':isMkt()?'board':'site';
   $('#root').innerHTML='<div class="spinner" style="margin-top:40vh"></div>';
   await loadAll();render();
 }
@@ -364,6 +384,7 @@ function renderLogin(){
 
 /* ---------- shell ---------- */
 const IC={
+ tool:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/></svg>',
  lock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
  home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>',
  jobs:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
@@ -375,17 +396,18 @@ const IC={
 };
 function go(v,id){S.view=v;if(id!==undefined)S.jobId=id;render();scrollTo(0,0)}
 function render(){
-  const tabs=isStaff()?[['home','Today',IC.home],['jobs','Jobs',IC.jobs],['board','Board',IC.board],['add','Log a day or job',IC.add],['nums','Numbers',IC.nums],['money','Money',IC.lock],['mkt','Marketing',IC.mkt]]
-    :isMkt()?[['board','Board',IC.board],['mkt','Marketing',IC.mkt]]:[['board','Board',IC.board]];
-  const allowed=new Set(tabs.map(t=>t[0]).concat(isStaff()?['job','review','rates','me']:['me']));
+  // phone bar keeps five or six; items marked desk only show in the desktop sidebar (and on the Me page)
+  const tabs=isStaff()?[['home','Today',IC.home],['jobs','Jobs',IC.jobs],['board','Board',IC.board],['add','Log the day',IC.add],['tool','Toolbox',IC.tool],['nums','Numbers',IC.nums],['money','Money',IC.lock,'desk'],['mkt','Marketing',IC.mkt,'desk']]
+    :isMkt()?[['board','Board',IC.board],['mkt','Marketing',IC.mkt]]:[['site','Jobs',IC.jobs],['board','Board',IC.board],['tool','Toolbox',IC.tool]];
+  const allowed=new Set(tabs.map(t=>t[0]).concat(isStaff()?['job','review','dayrev','rates','me','cjob']:isMkt()?['me']:['me','cjob']));
   if(S.finUntil&&Date.now()>S.finUntil)S.finUntil=0;
   const v=allowed.has(S.view)?S.view:tabs[0][0];
-  const cur=v==='job'||v==='review'?'jobs':v;
+  const cur=v==='job'||v==='review'?'jobs':v==='dayrev'?'add':v==='cjob'?(isStaff()?'jobs':'site'):v;
   $('#root').innerHTML=`<div class="app"><header class="top"><div class="brand"><b>BECK'S</b><span>LANDSCAPING HUB</span></div><button class="who" id="me">${esc(S.profile.name||'Me')}</button></header><main id="main"></main></div>
-  <nav class="tabs" aria-label="Main"><div class="brand nav-brand"><b>BECK'S</b><span>LANDSCAPING HUB</span></div>${tabs.map(([k,l,ic])=>`<button data-v="${k}" class="${k==='add'?'add':''} ${k==='money'?'desk':''} ${cur===k?'on':''}" aria-label="${l}">${ic}<span>${l}</span></button>`).join('')}<button class="nav-foot" id="me2">${esc(S.profile.name||'Me')} · ${esc(role())}</button></nav>`;
+  <nav class="tabs" aria-label="Main"><div class="brand nav-brand"><b>BECK'S</b><span>LANDSCAPING HUB</span></div>${tabs.map(([k,l,ic,d])=>`<button data-v="${k}" class="${k==='add'?'add':''} ${d||''} ${cur===k?'on':''}" aria-label="${l}">${ic}<span>${l}</span></button>`).join('')}<button class="nav-foot" id="me2">${esc(S.profile.name||'Me')} · ${esc(role())}</button></nav>`;
   document.querySelectorAll('nav.tabs button[data-v]').forEach(b=>b.onclick=()=>go(b.dataset.v));
   $('#me').onclick=()=>go('me');$('#me2').onclick=()=>go('me');
-  ({home:viewToday,money:viewMoney,jobs:viewJobs,board:viewBoard,add:viewAdd,review:viewReview,job:viewJob,nums:viewNumbers,mkt:viewMarketing,rates:viewRates,me:viewMe})[v]($('#main'));
+  ({home:viewToday,money:viewMoney,jobs:viewJobs,board:viewBoard,add:viewAdd,review:viewReview,dayrev:viewDayReview,tool:viewToolbox,site:viewSite,cjob:viewCrewJob,job:viewJob,nums:viewNumbers,mkt:viewMarketing,rates:viewRates,me:viewMe})[v]($('#main'));
 }
 function stageBar(stage){const i=STAGES.indexOf(stage);return `<div class="stagebar">${STAGES.map((_,k)=>`<i class="${k<=i?'on':''}"></i>`).join('')}</div>`}
 function stagePill(s){const c=s==='Lost'?'bad':PENCIL.includes(s)?'warn':['Paid'].includes(s)?'grey':['Complete','Invoiced'].includes(s)?'good':'';return `<span class="pill ${c}">${esc(s)}</span>`}
@@ -411,6 +433,10 @@ function viewToday(el){
   const plural=(n,a,b)=>n===1?a:b;
 
   const needs=timingAlerts().map(a=>[a.lvl,a.t,a.s,'job',a.kind==='quote'?'Quote':a.kind==='reply'?'Call':'Book',a.j.id]);
+  const loggedToday=S.crewDays.some(d=>d.work_date===iso(t0)),onToday=S.jobs.some(j=>j.start_date&&j.end_date&&j.start_date<=iso(t0)&&j.end_date>=iso(t0)&&!['Lost','Paid'].includes(j.stage));
+  if(isWork(t0)&&now.getHours()>=14&&!loggedToday&&onToday)needs.unshift(['warn',"Log today's crew",'Who was where, hours and any problems. Talk it in.','add','Log']);
+  const openIss=(S.issues||[]).filter(i=>i.status==='open');
+  if(openIss.length)needs.push(['info',`${openIss.length} ${plural(openIss.length,'problem','problems')} for Monday toolbox`,openIss.slice(0,2).map(i=>esc(i.note)).join(' · '),'tool','Toolbox']);
   if(noDates.length)needs.push(['bad',`${noDates.length} booked ${plural(noDates.length,'job has','jobs have')} no start date`,`Not on the board. ${names(noDates)}`,'board','Board']);
   if(quotesOut.length)needs.push(['warn',`${quotesOut.length} ${plural(quotesOut.length,'quote','quotes')} out over a week`,`Follow up. ${names(quotesOut)}`,'jobs','Open']);
   if(chase.length)needs.push(['warn',`Chase ${chase.length} ${plural(chase.length,'invoice','invoices')}`,`Oldest first. ${names(chase)}`,'money','Money']);
@@ -555,12 +581,12 @@ function viewBoard(el){
   </div></div>
   <div class="legend"><span><b style="background:repeating-linear-gradient(45deg,#c9a96e 0 4px,#d6bb87 4px 8px)"></b>Lead, design or quote (pencilled)</span><span><b style="background:var(--green)"></b>Booked</span><span><b style="background:var(--green-2)"></b>On site</span><span><b style="background:#8d9a97"></b>Finished</span><span><b style="background:rgba(201,169,110,.18);border:1.5px dashed var(--sand)"></b>Promised start window</span><span><b style="background:var(--bad);width:2px"></b>Today</span></div>`:`<div class="empty">Nothing booked yet.</div>`}
   ${isStaff()?`<div class="card"><h2>This week on site</h2>${weekList(live,monday(t0))}</div>`:''}`;
-  if(isStaff())el.querySelectorAll('.g-lab[data-id]').forEach(b=>b.onclick=()=>go('job',b.dataset.id));
+  el.querySelectorAll('.g-lab[data-id]').forEach(b=>b.onclick=()=>isStaff()?go('job',b.dataset.id):!isMkt()&&go('cjob',b.dataset.id));
   bindDrag(el,W);
   bindTips(el);
 }
 function bindDrag(el,W){
-  el.querySelectorAll('.g-bar[data-id]:not([data-drag])').forEach(b=>b.onclick=()=>isStaff()&&go('job',b.dataset.id));
+  el.querySelectorAll('.g-bar[data-id]:not([data-drag])').forEach(b=>b.onclick=()=>isStaff()?go('job',b.dataset.id):!isMkt()&&go('cjob',b.dataset.id));
   el.querySelectorAll('[data-drag]').forEach(bar=>{
     let x0=null,left0=0,moved=0;
     bar.addEventListener('pointerdown',e=>{if(e.button>0)return;x0=e.clientX;left0=parseFloat(bar.style.left);moved=0;bar.setPointerCapture(e.pointerId);bar.classList.add('lift')});
@@ -656,7 +682,7 @@ async function viewMarketing(el){
   <div class="card"><h2>Add a post or campaign</h2>
    <div class="split"><div><label>Week of</label><select id="cw">${wks.map(w=>`<option value="${iso(w.ws)}">${w.ws.toLocaleDateString('en-AU',{day:'numeric',month:'short'})}</option>`).join('')}</select></div>
    <div><label>Channel</label><select id="cc">${['Instagram','Facebook','Instagram + Facebook','Instagram Stories','Google','Email','Website'].map(c=>`<option>${c}</option>`).join('')}</select></div></div>
-   <label>Title</label><input id="ct" placeholder="e.g. Before and after carousel, Floreat">
+   <label>Title</label><input id="ct" data-mic placeholder="e.g. Before and after carousel, Floreat">
    <label>Detail</label><textarea id="cd" style="min-height:70px" placeholder="What it is and what it links to"></textarea>
    <div class="split"><div><label>Goal</label><select id="cg"><option>Design sales</option><option>Fill capacity</option><option>Brand</option></select></div><div><label>Owner</label><input id="co" value="Lauren"></div></div>
    <button class="btn" id="cadd" style="margin-top:12px">Add to plan</button></div>
@@ -668,12 +694,199 @@ async function viewMarketing(el){
     if(error)return toast(error.message);S.camps.push(data);toast('Added');render()};
 }
 
+/* ---------- talk into any box ---------- */
+const SRC=window.SpeechRecognition||window.webkitSpeechRecognition;let dict=null;
+function dictate(field,btn){
+  if(!SRC){field.focus();return toast('Use the mic on your keyboard')}
+  if(dict){const was=dict.btn;dict.r.stop();if(was===btn)return}
+  const r=new SRC();r.lang='en-AU';r.continuous=true;r.interimResults=true;
+  const base=field.value?field.value.replace(/\s*$/,' '):'';let fin='';
+  r.onresult=ev=>{let interim='';for(let i=ev.resultIndex;i<ev.results.length;i++){const x=ev.results[i];if(x.isFinal)fin+=x[0].transcript+' ';else interim+=x[0].transcript}
+    field.value=base+fin+interim;field.dispatchEvent(new Event('input',{bubbles:true}))};
+  r.onend=()=>{btn.classList.remove('live');field.value=(base+fin).trim()||field.value;field.dispatchEvent(new Event('input',{bubbles:true}));field.dispatchEvent(new Event('change',{bubbles:true}));if(dict&&dict.r===r)dict=null};
+  r.onerror=ev=>toast(ev.error==='not-allowed'?'Allow the microphone in settings':'Mic stopped');
+  r.start();btn.classList.add('live');dict={r,btn};
+}
+function addMics(root){
+  root.querySelectorAll('textarea:not([data-nomic]):not(.has-mic),input[data-mic]:not(.has-mic)').forEach(f=>{
+    if(f.id==='tx')return;
+    f.classList.add('has-mic');const w=document.createElement('span');w.className='micwrap';f.parentNode.insertBefore(w,f);w.appendChild(f);
+    const b=document.createElement('button');b.type='button';b.className='minimic';b.setAttribute('aria-label','Talk instead of typing');b.innerHTML=IC.mic;
+    b.onclick=()=>dictate(f,b);w.appendChild(b)});
+}
+new MutationObserver(()=>{const m=$('#main');if(m)addMics(m)}).observe(document.getElementById('root'),{childList:true,subtree:true});
+
+/* ---------- log the day (owner and admin) ---------- */
+const CATS=['Tools and gear','Safety','Materials and suppliers','Time and lateness','Client','Quality','Other'];
+const openJobs=()=>S.jobs.filter(j=>!['Paid','Lost'].includes(j.stage)).sort((a,b)=>(a.start_date||'9').localeCompare(b.start_date||'9'));
+const jobLabel=j=>`${j.clients?.name||'No name'}${j.suburb?', '+j.suburb:''}`;
+const hm=t=>{if(!t)return null;const m=/^(\d{1,2}):?(\d{2})?/.exec(t);return m?+m[1]+(+(m[2]||0))/60:null};
+function hoursFrom(a,b){const x=hm(a),y=hm(b);if(x==null||y==null||y<=x)return null;const brk=+(S.settings.break_minutes??30)/60;const h=y-x;return Math.round((h>5?h-brk:h)*4)/4}
+function viewDay(el){
+  const d=S.dayTalk||(S.dayTalk={transcript:'',date:iso(today0())});
+  el.innerHTML=`${addToggle()}<div style="margin:14px 0 4px"><h1>Log the day</h1><p class="small muted" style="margin:4px 0 0">Who was where, what time, and anything that went wrong.</p></div>
+  <div class="card">
+   <label for="dd">Day</label><input type="date" id="dd" value="${d.date}" style="max-width:220px">
+   <div class="recorder"><button class="bigmic" id="mic" aria-label="Talk">${IC.mic.replace('<svg','<svg width="38" height="38"')}</button><div class="small muted" id="ms">${SRC?'Tap to talk':'Tap the box below and use the keyboard mic'}</div></div>
+   <textarea id="tx" data-nomic placeholder="Zach and Jake at Pearse in Claremont, seven till four. Troy was there seven till eleven then went to Loader in Palmyra till half three. Problems: Troy didn't grab the tools so we lost an hour. Limestone was late.">${esc(d.transcript)}</textarea>
+   <button class="btn block" style="margin-top:12px" id="read">Sort it out</button>
+   <button class="btn ghost block" style="margin-top:8px" id="manual">Enter it myself</button></div>
+  <div class="card small muted">Say who, which job, start and finish times, who moved between jobs, and any problems. It comes back for you to check before anything saves.</div>`;
+  bindToggle();
+  $('#tx').oninput=e=>d.transcript=e.target.value;$('#dd').onchange=e=>d.date=e.target.value;
+  $('#mic').onclick=()=>dictate($('#tx'),$('#mic'));
+  $('#manual').onclick=()=>{S.dayDraft={date:d.date,entries:[{name:'',job_id:'',hours:+(S.settings.hours_per_day||8)}],issues:[],new_people:[],questions:[]};go('dayrev')};
+  $('#read').onclick=async()=>{d.transcript=$('#tx').value.trim();if(!d.transcript)return toast('Talk it through first');
+    $('#read').disabled=true;$('#read').textContent='Reading it…';
+    const {data,error}=await sb.functions.invoke('parse-day',{body:{transcript:d.transcript,date:d.date}});
+    $('#read').disabled=false;$('#read').textContent='Sort it out';
+    let msg=data?.error;if(error&&!msg){try{msg=(await error.context.json()).error}catch{msg=error.message}}
+    if(msg||!data?.day)return toast(msg||'Could not read that. Try again.');
+    const day=data.day;day.date=day.date||d.date;day.entries=(day.entries||[]).map(e=>({...e,job_id:S.jobs.some(j=>j.id===e.job_id)?e.job_id:''}));
+    day.issues=(day.issues||[]).map(i=>({...i,job_id:S.jobs.some(j=>j.id===i.job_id)?i.job_id:''}));
+    S.dayDraft=day;go('dayrev')};
+}
+function viewDayReview(el){
+  const D=S.dayDraft;if(!D)return go('add');
+  const jobs=openJobs(),names=[...new Set(S.crew.filter(c=>c.active!==false).map(c=>c.name).concat(D.new_people||[]).concat(D.entries.map(e=>e.name).filter(Boolean)))];
+  const jobSel=(v,attr)=>`<select ${attr}><option value="">Pick the job</option>${jobs.map(j=>`<option value="${j.id}" ${j.id===v?'selected':''}>${esc(jobLabel(j))}</option>`).join('')}</select>`;
+  const unknown=(D.new_people||[]).filter(n=>!crewMatch(n));
+  const total=D.entries.reduce((a,e)=>a+(+e.hours||0),0);
+  el.innerHTML=`<div style="margin:18px 0 4px"><button class="btn light sm" id="back">‹ Back</button></div>
+  <div class="row between wrap" style="margin-top:10px"><h1>Check the day</h1><input type="date" id="rdate" value="${D.date}" style="max-width:180px"></div>
+  ${(D.questions||[]).length?`<div class="card">${D.questions.map(q=>`<div class="q">${esc(q)}</div>`).join('')}</div>`:''}
+  ${unknown.length?`<div class="card"><h2>New names</h2><p class="small muted" style="margin:4px 0 8px">Not on the crew list yet.</p>${unknown.map(n=>`<button class="chip" data-newcrew="${esc(n)}">+ Add ${esc(n)} to the crew</button>`).join(' ')}</div>`:''}
+  <div class="card"><div class="row between"><h2>Who worked where</h2><span class="small muted">${r1(total)} hours</span></div>
+   <div class="daytbl">${D.entries.map((e,i)=>`<div class="dayrow" data-i="${i}">
+     <div class="f-name"><label>Who</label><input list="crewnames" data-k="name" value="${esc(e.name||'')}"></div>
+     <div class="f-job"><label>Job${e.job_heard&&!e.job_id?` <span class="pill warn">heard "${esc(e.job_heard)}"</span>`:''}</label>${jobSel(e.job_id,'data-k="job_id"')}</div>
+     <div class="f-t"><label>Start</label><input type="time" data-k="start" value="${esc(e.start||'')}"></div>
+     <div class="f-t"><label>Finish</label><input type="time" data-k="end" value="${esc(e.end||'')}"></div>
+     <div class="f-h"><label>Hours</label><input inputmode="decimal" data-k="hours" value="${e.hours??''}"></div>
+     <div class="f-x"><label class="chk"><input type="checkbox" data-k="is_variation" ${e.is_variation?'checked':''}> Variation</label><button class="btn light sm" data-del="${i}" aria-label="Remove row">Remove</button></div>
+   </div>`).join('')}</div>
+   <datalist id="crewnames">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
+   <button class="btn light sm" id="addrow" style="margin-top:10px">+ Add a person</button>
+   <p class="tiny muted" style="margin:8px 0 0">Hours come from start and finish, less a ${S.settings.break_minutes??30} minute break on days over 5 hours. Change it in Rates.</p></div>
+  <div class="card"><div class="row between"><h2>Problems for toolbox</h2><span class="small muted">${D.issues.length}</span></div>
+   ${D.issues.map((x,i)=>`<div class="issrow" data-q="${i}">
+     <div class="split"><div><label>Type</label><select data-k="category">${CATS.map(c=>`<option ${c===x.category?'selected':''}>${c}</option>`).join('')}</select></div><div><label>Job</label>${jobSel(x.job_id,'data-k="job_id"')}</div></div>
+     <label>What happened</label><textarea data-k="note" style="min-height:64px">${esc(x.note||'')}</textarea>
+     <div class="split"><div><label>Who</label><input data-k="people" value="${esc((x.people||[]).join(', '))}"></div><div><label>Hours lost</label><input inputmode="decimal" data-k="lost_hours" value="${x.lost_hours??''}"></div></div>
+     <button class="btn light sm" data-qdel="${i}" style="margin-top:8px">Remove</button></div>`).join('')||'<p class="small muted" style="margin:6px 0 0">No problems logged.</p>'}
+   <button class="btn light sm" id="addiss" style="margin-top:10px">+ Add a problem</button></div>
+  <button class="btn block" id="saveday">Save the day</button>`;
+  $('#back').onclick=()=>go('add');$('#rdate').onchange=e=>D.date=e.target.value;
+  el.querySelectorAll('.dayrow').forEach(row=>{const e=D.entries[+row.dataset.i];
+    row.querySelectorAll('[data-k]').forEach(f=>f.onchange=f.oninput=()=>{const k=f.dataset.k;e[k]=f.type==='checkbox'?f.checked:f.value;
+      if(k==='start'||k==='end'){const h=hoursFrom(e.start,e.end);if(h!=null){e.hours=h;row.querySelector('[data-k="hours"]').value=h}}})});
+  el.querySelectorAll('.issrow').forEach(row=>{const x=D.issues[+row.dataset.q];
+    row.querySelectorAll('[data-k]').forEach(f=>f.oninput=f.onchange=()=>{const k=f.dataset.k;x[k]=k==='people'?f.value.split(',').map(t=>t.trim()).filter(Boolean):f.value})});
+  el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{D.entries.splice(+b.dataset.del,1);render()});
+  el.querySelectorAll('[data-qdel]').forEach(b=>b.onclick=()=>{D.issues.splice(+b.dataset.qdel,1);render()});
+  $('#addrow').onclick=()=>{D.entries.push({name:'',job_id:D.entries.at(-1)?.job_id||'',hours:+(S.settings.hours_per_day||8)});render()};
+  $('#addiss').onclick=()=>{D.issues.push({category:'Other',note:'',job_id:'',people:[]});render()};
+  el.querySelectorAll('[data-newcrew]').forEach(b=>b.onclick=async()=>{const {error}=await sb.from('crew').insert({name:b.dataset.newcrew,charge_per_day:DAY_RATE()});if(error)return toast(error.message);await loadAll();toast(b.dataset.newcrew+' added');render()});
+  $('#saveday').onclick=async()=>{
+    const rows=D.entries.filter(e=>e.name||e.job_id);
+    for(const e of rows){if(!e.name)return toast('Add a name on every row');if(!e.job_id)return toast(`Pick the job for ${e.name}`);if(!(+e.hours>0))return toast(`Add hours for ${e.name}`)}
+    const missing=[...new Set(rows.filter(e=>!crewMatch(e.name)).map(e=>e.name))];if(missing.length)return toast(`Add ${missing.join(', ')} to the crew first`);
+    $('#saveday').disabled=true;$('#saveday').textContent='Saving…';
+    let report=null;const rep=await sb.from('day_reports').insert({work_date:D.date,transcript:S.dayTalk?.transcript||null}).select('id').single();if(!rep.error)report=rep.data.id;
+    const hpd=+(S.settings.hours_per_day||8);
+    const base=rows.map(e=>{const c=crewMatch(e.name);return{job_id:e.job_id,crew_id:c.id,crew_name:c.name,work_date:D.date,hours:+e.hours,charge:Math.round((+c.charge_per_day||DAY_RATE())*(+e.hours)/hpd*100)/100,is_variation:!!e.is_variation,note:e.note||null}});
+    let ins=await sb.from('crew_days').insert(base.map((b,i)=>({...b,start_time:rows[i].start||null,end_time:rows[i].end||null,report_id:report})));
+    if(ins.error)ins=await sb.from('crew_days').insert(base);
+    if(ins.error){$('#saveday').disabled=false;$('#saveday').textContent='Save the day';return toast(ins.error.message)}
+    const iss=D.issues.filter(x=>(x.note||'').trim());let issMsg='';
+    if(iss.length){const r=await sb.from('issues').insert(iss.map(x=>({job_id:x.job_id||null,work_date:D.date,category:CATS.includes(x.category)?x.category:'Other',note:x.note.trim(),people:Array.isArray(x.people)?x.people:[],lost_hours:+x.lost_hours||null,report_id:report})));
+      issMsg=r.error?'. Problems need the database update':`, ${iss.length} for toolbox`}
+    S.dayDraft=null;S.dayTalk=null;await loadAll();toast(`Day saved: ${rows.length} ${rows.length===1?'entry':'entries'}${issMsg}`);go('home')};
+}
+
+/* ---------- toolbox meeting ---------- */
+function nextMonday(){const t=today0();const d=new Date(t);const add=(8-d.getDay())%7;d.setDate(d.getDate()+add);return d}
+async function viewToolbox(el){
+  const mon=nextMonday(),t0=today0(),wkEnd=addDays(monday(t0.getDay()===0?addDays(t0,1):t0),6);
+  const onSite=S.jobs.filter(j=>j.start_date&&j.end_date&&!['Lost','Paid'].includes(j.stage)&&parse(j.start_date)<=addDays(mon,6)&&parse(j.end_date)>=mon);
+  const starting=S.jobs.map(j=>({j,p:promiseOf(j)})).filter(x=>x.p&&['soon','late'].includes(x.p.state));
+  let items;
+  if(isStaff()){
+    if(S.issues===null){el.innerHTML=`<h1 style="margin:18px 0 6px">Toolbox</h1><div class="card"><p class="small muted">Problems from the day log show here once the database update has run.</p></div>`;return}
+    items=S.issues.filter(i=>i.status==='open'||(i.discussed_at&&new Date(i.discussed_at)>addDays(t0,-7)));
+  }else{const {data,error}=await sb.rpc('toolbox_crew');items=error?[]:data||[]}
+  const lost=items.filter(i=>i.status==='open').reduce((a,i)=>a+(+i.lost_hours||0),0);
+  const byCat=CATS.map(c=>[c,items.filter(i=>i.category===c)]).filter(x=>x[1].length);
+  const sub=j=>j?(isStaff()?jobLabel(j):j.suburb||''):'';
+  const jobOf=i=>isStaff()?S.jobs.find(j=>j.id===i.job_id):null;
+  el.innerHTML=`<div class="row between wrap" style="margin:18px 0 6px"><div><div class="eyebrow">Monday ${mon.toLocaleDateString('en-AU',{day:'numeric',month:'long'})}</div><h1 style="margin-top:4px">Toolbox</h1></div>
+   ${isStaff()?`<button class="btn light sm" id="wa">Copy for WhatsApp</button>`:''}</div>
+  <div class="tiles">
+   <div class="tile dark"><div class="eyebrow">To talk about</div><div class="v">${items.filter(i=>i.status==='open').length}</div><div class="s">Open problems</div><div class="src">From the day log${isStaff()?' and crew reports':''}</div></div>
+   <div class="tile"><div class="eyebrow">Hours lost</div><div class="v ${lost?'bad':''}">${r1(lost)}</div><div class="s">${lost?`About ${money(lost*(+S.settings.labour_rate||75))} of labour`:'None logged'}</div><div class="src">Open problems with hours lost</div></div>
+   <div class="tile"><div class="eyebrow">On site this week</div><div class="v">${onSite.length}</div><div class="s">${onSite.length?onSite.map(j=>esc(j.suburb||'')).join(', '):'Nothing booked'}</div><div class="src">From the board</div></div>
+   <div class="tile"><div class="eyebrow">Starts to plan</div><div class="v">${starting.length}</div><div class="s">${starting.length?'Promised windows coming up':'None due'}</div><div class="src">Promised start dates</div></div>
+  </div>
+  <div class="card"><h2>1 · This week</h2>${onSite.length?`<table style="margin-top:8px">${onSite.map(j=>`<tr><td class="small" style="width:120px">${fmtShort(j.start_date)} to ${fmtShort(j.end_date)}</td><td><b class="small">${esc(sub(j))}</b><div class="tiny muted">${esc(j.title||'')} · ${j.crew_size||2} crew</div></td></tr>`).join('')}</table>`:'<p class="small muted" style="margin:6px 0 0">Nothing on the board this week.</p>'}
+   ${starting.length?`<div style="margin-top:10px">${starting.map(({j,p})=>`<div class="small" style="margin:4px 0"><span class="pill ${p.state==='late'?'bad':'warn'}">${p.state==='late'?'Missed':'Coming up'}</span> ${esc(sub(j))}: ${p.msg}</div>`).join('')}</div>`:''}</div>
+  <div class="card"><h2>2 · What went wrong and how we sort it</h2>
+   ${byCat.length?byCat.map(([c,list])=>`<div class="eyebrow" style="margin:16px 0 4px">${c} · ${list.length}</div>${list.map(i=>`<div class="tb-item ${i.status}">
+     <div class="row between" style="align-items:flex-start"><div style="flex:1"><b class="small">${esc(i.note)}</b><div class="tiny muted">${fmtShort(String(i.work_date).slice(0,10))}${isStaff()?(jobOf(i)?' · '+esc(sub(jobOf(i))):'')+((i.people||[]).length?' · '+esc(i.people.join(', ')):''):(i.suburb?' · '+esc(i.suburb):'')}${i.lost_hours?` · ${r1(i.lost_hours)}h lost`:''}</div></div>
+     <span class="pill ${i.status==='open'?'warn':i.status==='sorted'?'good':''}">${i.status==='open'?'To talk about':i.status==='sorted'?'Sorted':'Talked about'}</span></div>
+     ${isStaff()?`<div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap"><input data-act="${i.id}" data-mic placeholder="What we'll do about it" value="${esc(i.action||'')}" style="flex:1;min-width:200px">
+      ${i.status==='open'?`<button class="btn light sm" data-st="discussed" data-id="${i.id}">Talked about</button>`:''}${i.status!=='sorted'?`<button class="btn sm" data-st="sorted" data-id="${i.id}">Sorted</button>`:''}</div>`:(i.action?`<div class="small" style="margin-top:6px">→ ${esc(i.action)}</div>`:'')}
+   </div>`).join('')}`).join(''):'<p class="small muted" style="margin:6px 0 0">Nothing logged. Problems from the day log land here.</p>'}</div>
+  <div class="card"><h2>3 · Safety check</h2><p class="small muted" style="margin:6px 0 0">PPE, plant and tools checked. Any near misses. Sun, heat and hydration.</p></div>
+  ${!isStaff()?`<div class="card"><h2>Something to raise?</h2><p class="small muted" style="margin:4px 0 8px">Open the job from Jobs and report it there.</p></div>`:''}`;
+  if(!isStaff())return;
+  el.querySelectorAll('[data-act]').forEach(f=>f.onchange=async()=>{await sb.from('issues').update({action:f.value||null}).eq('id',f.dataset.act);const i=S.issues.find(x=>x.id===f.dataset.act);if(i)i.action=f.value;toast('Saved')});
+  el.querySelectorAll('[data-st]').forEach(b=>b.onclick=async()=>{const {error}=await sb.from('issues').update({status:b.dataset.st,discussed_at:new Date().toISOString()}).eq('id',b.dataset.id);if(error)return toast(error.message);await loadAll();render()});
+  $('#wa').onclick=()=>{const lines=[`*Toolbox · Monday ${mon.toLocaleDateString('en-AU',{day:'numeric',month:'short'})}*`,'','*This week*',...(onSite.length?onSite.map(j=>`• ${j.suburb||''}: ${j.title||''} (${fmtShort(j.start_date)} to ${fmtShort(j.end_date)})`):['• Nothing on the board yet']),'',
+    '*To sort*',...(byCat.length?byCat.flatMap(([c,l])=>[`_${c}_`,...l.filter(i=>i.status!=='sorted').map(i=>`• ${i.note}${i.action?` → ${i.action}`:''}`)]):['• Nothing logged']),'','*Safety*','• PPE, plant and tools checked. Sun and water.'];
+    navigator.clipboard?.writeText(lines.join('\n')).then(()=>toast('Copied. Paste into WhatsApp.'))};
+}
+
+/* ---------- crew: jobs and one job ---------- */
+function viewSite(el){
+  const t0=today0(),soon=addDays(t0,21);
+  const list=S.jobs.filter(j=>j.start_date&&j.end_date&&!['Lost','Paid','Complete','Invoiced'].includes(j.stage)&&parse(j.end_date)>=t0&&parse(j.start_date)<=soon).sort((a,b)=>a.start_date.localeCompare(b.start_date));
+  el.innerHTML=`<h1 style="margin:18px 0 6px">Jobs</h1><p class="small muted" style="margin:0 0 8px">On now and the next three weeks. Tap one for the address, tasks and notes.</p>
+  ${list.length?list.map(j=>{const now=parse(j.start_date)<=t0;return `<button class="job" data-cj="${j.id}"><div class="row between"><h3>${esc(j.suburb||'Job')}</h3><span class="pill ${now?'good':''}">${now?'On now':'Starts '+fmtShort(j.start_date)}</span></div>
+   <div class="small muted">${esc(j.title||'')}</div><div class="small" style="margin-top:6px">${fmtD(j.start_date)} to ${fmtD(j.end_date)} · ${j.crew_size||2} crew</div></button>`}).join(''):'<div class="empty">Nothing on the board yet.</div>'}`;
+  el.querySelectorAll('[data-cj]').forEach(b=>b.onclick=()=>go('cjob',b.dataset.cj));
+}
+async function viewCrewJob(el){
+  el.innerHTML='<div class="spinner" style="margin-top:30vh"></div>';
+  const {data:j,error}=await sb.rpc('crew_job',{p_job:S.jobId});
+  if(error||!j){el.innerHTML=`<div style="margin:18px 0"><button class="btn light sm" id="back">‹ Jobs</button></div><div class="card"><p class="small muted">${error?'Job details switch on once the database update has run.':'Job not found.'}</p></div>`;$('#back').onclick=()=>go(isStaff()?'board':'site');return}
+  const addr=[j.address,j.suburb].filter(Boolean).join(', ');
+  el.innerHTML=`<div style="margin:18px 0 4px"><button class="btn light sm" id="back">‹ ${isStaff()?'Back':'Jobs'}</button></div>
+  <div class="card"><div class="row between"><h1>${esc(j.suburb||'Job')}</h1>${stagePill(j.stage)}</div>
+   <div class="small" style="margin-top:4px">${esc(j.title||'')}${j.client?` · ${esc(j.client)}`:''}</div>
+   ${addr?`<a class="btn light sm" style="margin-top:10px;display:inline-block" href="https://maps.google.com/?q=${encodeURIComponent(addr+' WA')}" target="_blank" rel="noopener">${esc(addr)} · Directions</a>`:''}
+   <p class="small" style="margin:10px 0 0">${j.start_date?`${fmtD(j.start_date)} to ${fmtD(j.end_date)} · ${j.crew_size||2} crew`:'Not on the board yet'}</p></div>
+  ${j.site_notes?`<div class="card"><h2>Notes from Greg</h2><p class="small" style="margin:6px 0 0;white-space:pre-wrap">${esc(j.site_notes)}</p></div>`:''}
+  <div class="card"><h2>Tasks</h2>${(j.tasks||[]).length?`<table style="margin-top:6px">${j.tasks.map(t=>`<tr><td><b class="small">${esc(t.task_type||'')}</b><div class="tiny muted">${esc(t.description||'')}${t.qty?` · ${t.qty} ${esc(t.unit||'')}`:''}</div></td><td class="num small">${t.start_date?fmtShort(t.start_date):''}</td></tr>`).join('')}</table>`:'<p class="small muted" style="margin:6px 0 0">No tasks listed.</p>'}</div>
+  ${(j.issues||[]).length?`<div class="card"><h2>Open problems</h2>${j.issues.map(i=>`<div class="small" style="margin:6px 0"><span class="pill warn">${esc(i.category)}</span> ${esc(i.note)}</div>`).join('')}</div>`:''}
+  <div class="card"><h2>Report a problem</h2><p class="small muted" style="margin:4px 0 0">Goes to Greg and onto the Monday toolbox list.</p>
+   <label for="rc">Type</label><select id="rc">${CATS.map(c=>`<option>${c}</option>`).join('')}</select>
+   <label for="rn">What happened</label><textarea id="rn" style="min-height:80px" placeholder="Tap the mic and say it"></textarea>
+   <button class="btn" id="rsend" style="margin-top:10px">Send</button></div>`;
+  $('#back').onclick=()=>go(isStaff()?'board':'site');
+  $('#rsend').onclick=async()=>{const note=$('#rn').value.trim();if(!note)return toast('Say what happened');
+    const {error}=await sb.from('issues').insert({job_id:j.id,category:$('#rc').value,note,people:[]});if(error)return toast(error.message);
+    $('#rn').value='';toast('Sent to Greg')};
+}
+
 /* ---------- new job ---------- */
 let rec=null;
+function addToggle(){return `<div class="seg" id="amode" style="margin:18px 0 0;max-width:360px"><button data-m="day" class="${S.addMode==='day'?'on':''}">Log the day</button><button data-m="job" class="${S.addMode==='job'?'on':''}">New job</button></div>`}
+function bindToggle(){document.querySelectorAll('#amode button').forEach(b=>b.onclick=()=>{S.addMode=b.dataset.m;render()})}
 function viewAdd(el){
+  if(S.addMode==='day')return viewDay(el);
   S.draft=S.draft||{transcript:'',images:[]};
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  el.innerHTML=`<div style="margin:18px 0 4px"><h1>New job</h1><p class="small muted" style="margin:4px 0 0">Photograph the notebook page, talk it through, or both.</p></div>
+  el.innerHTML=`${addToggle()}<div style="margin:14px 0 4px"><h1>New job</h1><p class="small muted" style="margin:4px 0 0">Photograph the notebook page, talk it through, or both.</p></div>
   <div class="card">
    <label class="btn light block" style="text-align:center;color:var(--green-2);margin:0">Photograph notebook page or drawing<input type="file" id="ph" accept="image/*" capture="environment" multiple class="hidden"></label>
    <div class="thumbs" id="th" style="margin-top:10px"></div>
@@ -691,6 +904,7 @@ function viewAdd(el){
     rec.onend=()=>{rec=null;$('#mic')?.classList.remove('live');$('#ms')&&($('#ms').textContent='Tap to keep talking');S.draft.transcript=$('#tx').value};
     rec.onerror=ev=>toast(ev.error==='not-allowed'?'Allow the microphone in settings':'Mic stopped');
     rec.start();$('#mic').classList.add('live');$('#ms').textContent='Listening. Tap to stop'};
+  bindToggle();
   $('#manual').onclick=()=>{S.draft.job={tasks:[{task_type:'',description:'',est_hours:8}]};go('review')};
   $('#build').onclick=async()=>{S.draft.transcript=$('#tx').value.trim();
     if(!S.draft.transcript&&!S.draft.images.length)return toast('Add a photo or talk first');
@@ -774,6 +988,10 @@ async function viewJob(el){
    <div class="small" style="margin-top:6px">${j.clients?.phone?`<a href="tel:${esc(j.clients.phone)}" style="color:var(--green-2)">${esc(j.clients.phone)}</a> `:''}${j.clients?.email?`<a href="mailto:${esc(j.clients.email)}" style="color:var(--green-2)">${esc(j.clients.email)}</a>`:''}</div>
    ${stageBar(j.stage)}</div>
   ${timingCard(j)}
+  <div class="card"><div class="row between"><h2>For the crew</h2><button class="btn light sm" id="cview">See what the crew see</button></div>
+   <label for="sn">Notes the crew can see: access, gate codes, what to bring</label><textarea id="sn" style="min-height:70px">${esc(j.site_notes||'')}</textarea>
+   <button class="btn light sm" id="snsave" style="margin-top:8px">Save</button>
+   ${(S.issues||[]).filter(i=>i.job_id===j.id&&i.status!=='sorted').map(i=>`<div class="small" style="margin:8px 0 0"><span class="pill warn">${esc(i.category)}</span> ${esc(i.note)}</div>`).join('')}</div>
   <div class="kpis">
    <div class="kpi"><div class="eyebrow">Quote ex GST</div><div class="v">${money(n.quoteEx)}</div><div class="s">${j.quote_total?money(j.quote_total)+' inc GST':'Not priced yet'}</div></div>
    <div class="kpi"><div class="eyebrow">Crew days</div><div class="v">${r1(n.actualDays)}<span class="small muted"> / ${r1(n.qDays)}</span></div><div class="s">Worked / quoted${n.varDays?`. ${r1(n.varDays)} were variations`:''}</div></div>
@@ -799,7 +1017,7 @@ async function viewJob(el){
    ${ts.map(t=>`<tr><td><b class="small">${esc(t.task_type)}</b>${t.is_variation?' <span class="pill warn">Variation</span>':''}<div class="tiny muted">${esc(t.description||'')}${t.qty?` · ${t.qty} ${esc(t.unit||'')}`:''}${t.sell_price?` · ${money(t.sell_price)}`:''}</div></td>
    <td class="num">${t.est_hours!=null?r1(t.est_hours):'–'}</td><td class="num" style="width:78px"><input data-act="${t.id}" value="${t.actual_hours??''}" inputmode="decimal" style="text-align:right" placeholder="–"></td></tr>`).join('')}
    </tbody></table>
-   <div class="row" style="margin-top:10px;gap:8px"><input id="vdesc" placeholder="Variation, e.g. extra ramp 2.4 x 3.9"><input id="vprice" placeholder="$" inputmode="decimal" style="width:90px"><button class="btn light sm" id="vadd">Add</button></div></div>
+   <div class="row" style="margin-top:10px;gap:8px"><input id="vdesc" data-mic placeholder="Variation, e.g. extra ramp 2.4 x 3.9"><input id="vprice" placeholder="$" inputmode="decimal" style="width:90px"><button class="btn light sm" id="vadd">Add</button></div></div>
 
   <div class="card"><div class="row between"><h2>Costs</h2><span class="small muted">${money(n.mats)}</span></div>
    ${cs.length?`<table style="margin-top:6px">${cs.map(c=>`<tr><td class="small">${esc(c.item)}<div class="tiny muted">${esc(c.supplier||'')}</div></td><td class="num small">${money(c.amount,2)}</td></tr>`).join('')}</table>`:'<p class="small muted">Add supplier invoices here to see the real margin.</p>'}
@@ -818,6 +1036,8 @@ async function viewJob(el){
 
   $('#back').onclick=()=>go('jobs');
   bindTiming(el,j);
+  $('#cview').onclick=()=>go('cjob',j.id);
+  $('#snsave').onclick=async()=>{const {error}=await sb.from('jobs').update({site_notes:$('#sn').value||null}).eq('id',j.id);if(error)return toast(S.dbReady?error.message:'Needs the database update first');j.site_notes=$('#sn').value;toast('Saved for the crew')};
   el.querySelectorAll('[data-stage]').forEach(b=>b.onclick=()=>setStage(j,b.dataset.stage,ts));
   $('#lost')&&($('#lost').onclick=()=>setStage(j,'Lost',ts));
   let len=8;el.querySelectorAll('#len button').forEach(b=>b.onclick=()=>{el.querySelectorAll('#len button').forEach(x=>x.classList.toggle('on',x===b));$('#lh').classList.toggle('hidden',b.dataset.h!=='x');len=b.dataset.h});
@@ -883,7 +1103,7 @@ async function viewRates(el){
    <button class="btn light sm" id="ss" style="margin-top:10px">Save</button></div>
   <div class="card"><h2>Timing alerts</h2><p class="small muted" style="margin:4px 0 0">These drive the alerts on Today.</p>
    <div class="split"><div><label for="rd">Reply to an enquiry within (days)</label><input id="rd" inputmode="numeric" value="${S.settings.reply_due_days??2}"></div><div><label for="qdd">Quote within (days)</label><input id="qdd" inputmode="numeric" value="${S.settings.quote_due_days??7}"></div></div>
-   <label for="pwd">Warn before a promised start window opens (days)</label><input id="pwd" inputmode="numeric" value="${S.settings.promise_warn_days??14}">
+   <div class="split"><div><label for="pwd">Warn before a promised window opens (days)</label><input id="pwd" inputmode="numeric" value="${S.settings.promise_warn_days??14}"></div><div><label for="brk">Unpaid break on a full day (minutes)</label><input id="brk" inputmode="numeric" value="${S.settings.break_minutes??30}"></div></div>
    <button class="btn light sm" id="ts" style="margin-top:10px">Save</button></div>
   <div class="card"><h2>Crew</h2><p class="small muted" style="margin:4px 0 8px">Charge per day drives the numbers. Add what each person costs Greg to see true margin.</p>
    <table><thead><tr><th>Name</th><th class="num">Charge/day</th><th class="num">Cost/day</th></tr></thead><tbody>
@@ -894,7 +1114,7 @@ async function viewRates(el){
    </tbody></table></div>
   <div class="card"><h2>What it learned</h2>${(log||[]).length?`<table style="margin-top:6px">${log.map(l=>`<tr><td class="small">${esc(l.task_type)}<div class="tiny muted">est ${r1(l.est_hours)}h, actual ${r1(l.actual_hours)}h</div></td><td class="num small">${l.old_hours_per_unit==null?'new':Math.round(l.old_hours_per_unit*100)/100+' →'} <b>${Math.round(l.new_hours_per_unit*100)/100}</b></td></tr>`).join('')}</table>`:'<p class="small muted">Nothing yet. Finish a job with actual hours on its tasks.</p>'}</div>`;
   $('#back').onclick=()=>go('nums');
-  $('#ts').onclick=async()=>{const p={reply_due_days:+$('#rd').value||2,quote_due_days:+$('#qdd').value||7,promise_warn_days:+$('#pwd').value||14};const {error}=await sb.from('settings').update(p).eq('id',1);if(error)return toast(S.dbReady?error.message:'Needs the database update first');Object.assign(S.settings,p);toast('Saved')};
+  $('#ts').onclick=async()=>{const p={reply_due_days:+$('#rd').value||2,quote_due_days:+$('#qdd').value||7,promise_warn_days:+$('#pwd').value||14,break_minutes:$('#brk').value===''?30:+$('#brk').value};const {error}=await sb.from('settings').update(p).eq('id',1);if(error)return toast(S.dbReady?error.message:'Needs the database update first');Object.assign(S.settings,p);toast('Saved')};
   $('#ss').onclick=async()=>{const p={labour_rate:+$('#lr').value||null,hours_per_day:+$('#hpd').value||8,default_crew:+$('#dc').value||2};await sb.from('settings').update(p).eq('id',1);Object.assign(S.settings,p);toast('Saved');render()};
   el.querySelectorAll('[data-crew]').forEach(i=>i.onchange=async()=>{await sb.from('crew').update({[i.dataset.k]:i.value===''?null:+i.value}).eq('id',i.dataset.crew);toast('Saved');await loadAll()});
   $('#ncadd').onclick=async()=>{const n=$('#nc').value.trim();if(!n)return;await sb.from('crew').insert({name:n,charge_per_day:DAY_RATE()});await loadAll();render()};
@@ -904,10 +1124,10 @@ async function viewRates(el){
 /* ---------- me ---------- */
 async function viewMe(el){
   el.innerHTML=`<div class="card" style="margin-top:18px"><h2>${esc(S.profile.name||S.user.email)}</h2><p class="small muted">${esc(S.user.email)} · ${esc(role())}</p>
-   ${isStaff()?`<button class="btn light sm" id="toRates" style="margin-right:6px">Rates and crew</button>`:''}<button class="btn ghost sm" id="lo">Log out</button></div>
-  ${isStaff()?`<div class="card"><h2>Team</h2><p class="small muted" style="margin:4px 0 8px">New logins wait here. Crew see the board only. Marketing sees the board and campaigns, no money.</p><div id="team"><div class="spinner"></div></div></div>`:''}
+   ${isStaff()?`<div class="row wrap" style="gap:6px;margin:8px 0"><button class="btn light sm" data-go="money">Money</button><button class="btn light sm" data-go="mkt">Marketing</button><button class="btn light sm" id="toRates">Rates and crew</button></div>`:''}<button class="btn ghost sm" id="lo">Log out</button></div>
+  ${isStaff()?`<div class="card"><h2>Team</h2><p class="small muted" style="margin:4px 0 8px">New logins wait here. Crew see jobs, the board and toolbox, no money or client contacts. Marketing sees the board, enquiries and campaigns, no money.</p><div id="team"><div class="spinner"></div></div></div>`:''}
   <div class="card small muted">Add to home screen: tap Share, then Add to Home Screen.</div>`;
-  $('#lo').onclick=()=>sb.auth.signOut();$('#toRates')&&($('#toRates').onclick=()=>go('rates'));
+  $('#lo').onclick=()=>sb.auth.signOut();$('#toRates')&&($('#toRates').onclick=()=>go('rates'));el.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
   if(!isStaff())return;
   const {data:people}=await sb.from('profiles').select('*').order('created_at');
   $('#team').innerHTML=(people||[]).map(p=>`<div class="row between" style="padding:6px 0;border-bottom:1px solid #f1ede3"><b class="small">${esc(p.name||'')}</b>

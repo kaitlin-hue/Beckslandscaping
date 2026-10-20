@@ -193,3 +193,78 @@ grant execute on function public.board_jobs() to authenticated;
 grant execute on function public.board_tasks() to authenticated;
 grant execute on function public.marketing_leads() to authenticated;
 grant execute on function public.submit_enquiry(jsonb) to anon, authenticated;
+
+------------------------------------------------------------------
+-- 6. Day log by voice, problems on site, toolbox meeting, crew job view
+------------------------------------------------------------------
+alter table public.crew_days add column if not exists start_time time;
+alter table public.crew_days add column if not exists end_time time;
+alter table public.crew_days add column if not exists report_id uuid;
+alter table public.jobs add column if not exists site_notes text;
+alter table public.settings add column if not exists break_minutes int not null default 30;
+
+create table if not exists public.day_reports (
+  id uuid primary key default gen_random_uuid(),
+  work_date date not null default current_date,
+  transcript text,
+  created_by uuid default auth.uid(),
+  created_at timestamptz not null default now()
+);
+alter table public.day_reports enable row level security;
+drop policy if exists "staff all day_reports" on public.day_reports;
+create policy "staff all day_reports" on public.day_reports for all using (public.is_staff()) with check (public.is_staff());
+
+create table if not exists public.issues (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid references public.jobs(id) on delete set null,
+  work_date date not null default current_date,
+  category text not null default 'Other'
+    check (category in ('Tools and gear','Safety','Materials and suppliers','Time and lateness','Client','Quality','Other')),
+  note text not null,
+  people text[] not null default '{}',
+  lost_hours numeric,
+  status text not null default 'open' check (status in ('open','discussed','sorted')),
+  action text,
+  report_id uuid,
+  raised_by uuid default auth.uid(),
+  created_at timestamptz not null default now(),
+  discussed_at timestamptz
+);
+alter table public.issues enable row level security;
+drop policy if exists "staff all issues" on public.issues;
+create policy "staff all issues" on public.issues for all using (public.is_staff()) with check (public.is_staff());
+drop policy if exists "team add issues" on public.issues;
+create policy "team add issues" on public.issues for insert with check (public.my_role() is not null and raised_by = auth.uid());
+drop policy if exists "own issues read" on public.issues;
+create policy "own issues read" on public.issues for select using (raised_by = auth.uid());
+
+-- Crew: one job's site details, no money, no client contact details
+create or replace function public.crew_job(p_job uuid)
+returns jsonb language sql stable security definer set search_path = public as $$
+  select case when public.my_role() is null then null else (
+    select jsonb_build_object(
+      'id', j.id, 'title', j.title, 'address', j.address, 'suburb', j.suburb, 'stage', j.stage,
+      'client', split_part(coalesce(c.name, ''), ' ', 1),
+      'start_date', j.start_date, 'end_date', j.end_date, 'crew_size', j.crew_size, 'site_notes', j.site_notes,
+      'tasks', coalesce((select jsonb_agg(jsonb_build_object('task_type', t.task_type, 'description', t.description, 'qty', t.qty,
+                 'unit', t.unit, 'est_hours', t.est_hours, 'start_date', t.start_date, 'end_date', t.end_date) order by t.seq)
+                 from public.job_tasks t where t.job_id = j.id), '[]'::jsonb),
+      'issues', coalesce((select jsonb_agg(jsonb_build_object('category', i.category, 'note', i.note, 'status', i.status, 'work_date', i.work_date) order by i.created_at desc)
+                 from public.issues i where i.job_id = j.id and i.status <> 'sorted'), '[]'::jsonb))
+    from public.jobs j left join public.clients c on c.id = j.client_id where j.id = p_job) end
+$$;
+
+-- Crew: the toolbox agenda without anyone's name on it
+create or replace function public.toolbox_crew()
+returns table (category text, note text, suburb text, status text, action text, work_date date)
+language sql stable security definer set search_path = public as $$
+  select i.category, i.note, j.suburb, i.status, i.action, i.work_date
+  from public.issues i left join public.jobs j on j.id = i.job_id
+  where public.my_role() is not null and (i.status = 'open' or i.discussed_at > now() - interval '7 days')
+  order by i.category, i.created_at
+$$;
+
+revoke all on function public.crew_job(uuid) from public, anon;
+revoke all on function public.toolbox_crew() from public, anon;
+grant execute on function public.crew_job(uuid) to authenticated;
+grant execute on function public.toolbox_crew() to authenticated;
