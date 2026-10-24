@@ -206,7 +206,7 @@ const sb = supabase.createClient("https://nwpperddaojaafsyuqyx.supabase.co","sb_
 const STAGES=['Lead','Design','Quoted','Accepted','Deposit in','Materials ordered','On site','Complete','Invoiced','Paid'];
 const BOOKED=['Accepted','Deposit in','Materials ordered','On site'];
 const PENCIL=['Lead','Design','Quoted'];
-const S={user:null,profile:null,view:'jobs',jobs:[],tasks:[],rates:[],settings:{},crew:[],crewDays:[],costs:[],camps:[],cps:[],leads:[],issues:[],addMode:'day',dayDraft:null,finSet:null,finUntil:0,dbReady:false,draft:null,jobId:null};
+const S={user:null,profile:null,view:'jobs',jobs:[],tasks:[],rates:[],settings:{},crew:[],crewDays:[],costs:[],camps:[],cps:[],leads:[],issues:[],addMode:'day',dayDraft:null,finSet:null,finUntil:0,dbReady:false,plan:[],qlines:[],orders:[],suppliers:[],v3:null,planDraft:null,draft:null,jobId:null};
 const $=(s,el=document)=>el.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=(n,dp=0)=>n==null||isNaN(n)?'–':(n<0?'-':'')+'$'+Math.abs(+n).toLocaleString('en-AU',{minimumFractionDigits:dp,maximumFractionDigits:dp});
@@ -260,6 +260,8 @@ async function loadAll(){
     q.cps=sb.from('checkpoints').select('job_id,stage,done_at').order('done_at');
     q.finSet=sb.rpc('finance_password_set');
     q.issues=sb.from('issues').select('*').order('created_at',{ascending:false}).limit(300);
+    q.plan=sb.from('job_plan_days').select('*').order('day_no');q.qlines=sb.from('quote_lines').select('*').order('seq');
+    q.orders=sb.from('purchase_orders').select('*').order('created_at');q.suppliers=sb.from('suppliers').select('*').order('name');
   }else{
     // crew and marketing: board data with no money. Falls back to the tables until the database update has run.
     q.jobs=sb.rpc('board_jobs');q.tasks=sb.rpc('board_tasks');
@@ -271,6 +273,8 @@ async function loadAll(){
     if(k==='finSet'){S.finSet=r.error?null:!!r.data;continue}
     if(k==='leads'&&r.error){S.leads=null;continue}
     if(k==='issues'&&r.error){S.issues=null;continue}
+    if(k==='plan'){S.v3=!r.error;S.plan=r.data||[];continue}
+    if(['qlines','orders','suppliers'].includes(k)&&r.error){S[k]=[];continue}
     S[k]=r.data||(k==='settings'?{}:[]);
   }
   S.dbReady=isStaff()?S.finSet!==null:true;
@@ -402,15 +406,15 @@ function render(){
   // phone bar keeps five or six; items marked desk only show in the desktop sidebar (and on the Me page)
   const tabs=isStaff()?[['home','Today',IC.home],['jobs','Jobs',IC.jobs],['board','Board',IC.board],['add','Log the day',IC.add],['tool','Toolbox',IC.tool],['nums','Numbers',IC.nums],['money','Money',IC.lock,'desk'],['mkt','Marketing',IC.mkt,'desk']]
     :isMkt()?[['board','Board',IC.board],['mkt','Marketing',IC.mkt]]:[['site','Jobs',IC.jobs],['board','Board',IC.board],['tool','Toolbox',IC.tool]];
-  const allowed=new Set(tabs.map(t=>t[0]).concat(isStaff()?['job','review','dayrev','rates','me','cjob']:isMkt()?['me']:['me','cjob']));
+  const allowed=new Set(tabs.map(t=>t[0]).concat(isStaff()?['job','review','dayrev','rates','me','cjob','quote']:isMkt()?['me']:['me','cjob']));
   if(S.finUntil&&Date.now()>S.finUntil)S.finUntil=0;
   const v=allowed.has(S.view)?S.view:tabs[0][0];
-  const cur=v==='job'||v==='review'?'jobs':v==='dayrev'?'add':v==='cjob'?(isStaff()?'jobs':'site'):v;
+  const cur=v==='job'||v==='review'||v==='quote'?'jobs':v==='dayrev'?'add':v==='cjob'?(isStaff()?'jobs':'site'):v;
   $('#root').innerHTML=`<div class="app"><header class="top"><div class="brand"><b>BECK'S</b><span>LANDSCAPING HUB</span></div><button class="who" id="me">${esc(S.profile.name||'Me')}</button></header><main id="main"></main></div>
   <nav class="tabs" aria-label="Main"><div class="brand nav-brand"><b>BECK'S</b><span>LANDSCAPING HUB</span></div>${tabs.map(([k,l,ic,d])=>`<button data-v="${k}" class="${k==='add'?'add':''} ${d||''} ${cur===k?'on':''}" aria-label="${l}">${ic}<span>${l}</span></button>`).join('')}<button class="nav-foot" id="me2">${esc(S.profile.name||'Me')} · ${esc(role())}</button></nav>`;
   document.querySelectorAll('nav.tabs button[data-v]').forEach(b=>b.onclick=()=>go(b.dataset.v));
   $('#me').onclick=()=>go('me');$('#me2').onclick=()=>go('me');
-  ({home:viewToday,money:viewMoney,jobs:viewJobs,board:viewBoard,add:viewAdd,review:viewReview,dayrev:viewDayReview,tool:viewToolbox,site:viewSite,cjob:viewCrewJob,job:viewJob,nums:viewNumbers,mkt:viewMarketing,rates:viewRates,me:viewMe})[v]($('#main'));
+  ({home:viewToday,money:viewMoney,jobs:viewJobs,board:viewBoard,add:viewAdd,review:viewReview,dayrev:viewDayReview,tool:viewToolbox,site:viewSite,cjob:viewCrewJob,job:viewJob,nums:viewNumbers,mkt:viewMarketing,rates:viewRates,me:viewMe,quote:viewQuote})[v]($('#main'));
 }
 function stageBar(stage){const i=STAGES.indexOf(stage);return `<div class="stagebar">${STAGES.map((_,k)=>`<i class="${k<=i?'on':''}"></i>`).join('')}</div>`}
 function stagePill(s){const c=s==='Lost'?'bad':PENCIL.includes(s)?'warn':['Paid'].includes(s)?'grey':['Complete','Invoiced'].includes(s)?'good':'';return `<span class="pill ${c}">${esc(s)}</span>`}
@@ -441,6 +445,12 @@ function viewToday(el){
   const openIss=(S.issues||[]).filter(i=>i.status==='open');
   if(openIss.length)needs.push(['info',`${openIss.length} ${plural(openIss.length,'problem','problems')} for Monday toolbox`,openIss.slice(0,2).map(i=>esc(i.note)).join(' · '),'tool','Toolbox']);
   if(noDates.length)needs.push(['bad',`${noDates.length} booked ${plural(noDates.length,'job has','jobs have')} no start date`,`Not on the board. ${names(noDates)}`,'board','Board']);
+  const apprW=(S.camps||[]).filter(c=>c.status==='For approval');
+  if(apprW.length)needs.push(['warn',`${apprW.length} marketing ${plural(apprW.length,'post','posts')} to approve`,`From Lauren. ${apprW.slice(0,2).map(c=>esc(c.title)).join(' · ')}`,'mkt','Approve']);
+  const accOnline=S.jobs.filter(j=>j.quote_accepted_at&&j.stage==='Accepted');
+  if(accOnline.length)needs.push(['info',`${accOnline.length} ${plural(accOnline.length,'quote','quotes')} accepted online`,`Raise the deposit in Xero and book a start. ${names(accOnline)}`,'job','Open',accOnline[0].id]);
+  const toOrder=S.jobs.filter(j=>['Accepted','Deposit in'].includes(j.stage)&&(S.qlines||[]).some(l=>l.job_id===j.id&&['Materials','Plant and hire'].includes(l.kind))&&!ordersFor(j.id).some(o=>o.status!=='Draft'));
+  if(toOrder.length)needs.push(['warn',`Order materials for ${toOrder.length} ${plural(toOrder.length,'job','jobs')}`,names(toOrder),'job','Order',toOrder[0].id]);
   if(quotesOut.length)needs.push(['warn',`${quotesOut.length} ${plural(quotesOut.length,'quote','quotes')} out over a week`,`Follow up. ${names(quotesOut)}`,'jobs','Open']);
   if(chase.length)needs.push(['warn',`Chase ${chase.length} ${plural(chase.length,'invoice','invoices')}`,`Oldest first. ${names(chase)}`,'money','Money']);
   if(unlogged.length)needs.push(['warn',`${unlogged.length} finished ${plural(unlogged.length,'job has','jobs have')} no crew log`,'Profit and labour only count jobs with logged days','nums','Log']);
@@ -646,6 +656,7 @@ async function viewMarketing(el){
   const won=leads.filter(l=>!['Lead','Design','Quoted','Lost'].includes(l.stage)).length,maxS=Math.max(1,...bySrc.map(x=>x[1]));
   el.innerHTML=`<div class="row between" style="margin:18px 0 6px"><h1>Marketing</h1><span class="small muted">Runs off the board</span></div>
   <p class="small muted" style="margin:0 0 6px">When the board has room, push the $990 design. When it's full, show the work. Suburbs only, never street names.</p>
+  ${approvalsCard()}
   <div class="card"><div class="row between"><h2>Enquiries</h2><span class="small muted">Last 90 days</span></div>
    ${S.leads===null?'<p class="small muted" style="margin:6px 0 0">Website enquiries show here once the database update has run.</p>':leads.length?`
    <div class="kpis" style="margin-top:10px"><div class="kpi"><div class="eyebrow">Enquiries</div><div class="v">${leads.length}</div></div><div class="kpi"><div class="eyebrow">Became jobs</div><div class="v">${won}</div><div class="s">${pct(won/leads.length)} of enquiries</div></div></div>
@@ -656,21 +667,24 @@ async function viewMarketing(el){
   <div class="card"><h2>Next 8 weeks</h2><table style="margin-top:8px"><tbody>
    ${wks.map(w=>{const[k,t,d]=status(w);const camps=S.camps.filter(c=>c.week_start===iso(w.ws));return `<tr><td style="width:70px"><b class="small">${w.ws.toLocaleDateString('en-AU',{day:'numeric',month:'short'})}</b><div class="tiny muted">${r1(w.free)} free</div></td>
     <td><span class="pill ${k==='push'?'warn':k==='hold'?'grey':'good'}">${t}</span><div class="tiny muted" style="margin-top:3px">${d}</div>
-    ${camps.map(c=>`<div class="camp ${c.goal!=='Brand'?'push':''}"><div class="row between"><b class="small">${esc(c.title)}</b><select data-cid="${c.id}" style="width:auto;padding:3px 6px;font-size:12px">${['Planned','Drafted','Approved','Live','Done'].map(s=>`<option ${s===c.status?'selected':''}>${s}</option>`).join('')}</select></div><div class="tiny muted">${esc(c.channel)} · ${esc(c.goal)} · ${esc(c.owner||'')}</div>${c.detail?`<div class="small" style="margin-top:4px">${esc(c.detail)}</div>`:''}</div>`).join('')}</td></tr>`}).join('')}
+    ${camps.map(campHtml).join('')}</td></tr>`}).join('')}
   </tbody></table></div>
   <div class="card"><h2>Add a post or campaign</h2>
    <div class="split"><div><label>Week of</label><select id="cw">${wks.map(w=>`<option value="${iso(w.ws)}">${w.ws.toLocaleDateString('en-AU',{day:'numeric',month:'short'})}</option>`).join('')}</select></div>
    <div><label>Channel</label><select id="cc">${['Instagram','Facebook','Instagram + Facebook','Instagram Stories','Google','Email','Website'].map(c=>`<option>${c}</option>`).join('')}</select></div></div>
    <label>Title</label><input id="ct" data-mic placeholder="e.g. Before and after carousel, Floreat">
    <label>Detail</label><textarea id="cd" style="min-height:70px" placeholder="What it is and what it links to"></textarea>
+   <label>Caption or copy</label><textarea id="ccopy" style="min-height:80px" placeholder="The words that go out"></textarea>
+   <label>Link to the image or video (Drive, Canva)</label><input id="casset" placeholder="https://">
    <div class="split"><div><label>Goal</label><select id="cg"><option>Design sales</option><option>Fill capacity</option><option>Brand</option></select></div><div><label>Owner</label><input id="co" value="Lauren"></div></div>
-   <button class="btn" id="cadd" style="margin-top:12px">Add to plan</button></div>
+   <div class="row wrap" style="gap:8px;margin-top:12px"><button class="btn light" id="cadd">Save as draft</button><button class="btn" id="caddsend">${isStaff()?'Add as approved':'Send for approval'}</button></div></div>
   <div class="card"><h2>Jobs with content to use</h2><p class="small muted" style="margin:4px 0 8px">On site or finished. Ask Greg for photos at each checkpoint.</p>
    ${ready.length?ready.map(j=>`<div class="row between" style="padding:6px 0;border-bottom:1px solid #f1ede3"><div><b class="small">${esc(j.suburb||'Job')}</b><div class="tiny muted">${esc(j.title||'')}</div></div>${stagePill(j.stage)}</div>`).join(''):'<p class="small muted">None yet.</p>'}</div>`;
-  el.querySelectorAll('[data-cid]').forEach(s=>s.onchange=async()=>{await sb.from('campaigns').update({status:s.value}).eq('id',s.dataset.cid);const c=S.camps.find(x=>x.id===s.dataset.cid);if(c)c.status=s.value;toast('Updated')});
+  bindCamps(el);
   $('#cadd').onclick=async()=>{const t=$('#ct').value.trim();if(!t)return toast('Add a title');
-    const {data,error}=await sb.from('campaigns').insert({week_start:$('#cw').value,channel:$('#cc').value,title:t,detail:$('#cd').value,goal:$('#cg').value,owner:$('#co').value}).select().single();
-    if(error)return toast(error.message);S.camps.push(data);toast('Added');render()};
+    const {data,error}=await sb.from('campaigns').insert({week_start:$('#cw').value,channel:$('#cc').value,title:t,detail:$('#cd').value,goal:$('#cg').value,owner:$('#co').value,copy:$('#ccopy').value||null,asset_url:$('#casset').value.trim()||null,status:S.addStatus||'Drafted'}).select().single();
+    S.addStatus=null;if(error)return toast(error.message);S.camps.push(data);toast(data.status==='For approval'?'Sent to Greg and Kaitlin':'Added');render()};
+  $('#caddsend').onclick=()=>{S.addStatus=isStaff()?'Approved':'For approval';$('#cadd').click()};
 }
 
 /* ---------- talk into any box ---------- */
@@ -845,6 +859,7 @@ async function viewCrewJob(el){
    ${addr?`<a class="btn light sm" style="margin-top:10px;display:inline-block" href="https://maps.google.com/?q=${encodeURIComponent(addr+' WA')}" target="_blank" rel="noopener">${esc(addr)} · Directions</a>`:''}
    <p class="small" style="margin:10px 0 0">${j.start_date?`${fmtD(j.start_date)} to ${fmtD(j.end_date)} · ${j.crew_size||2} crew`:'Not on the board yet'}</p></div>
   ${j.site_notes?`<div class="card"><h2>Notes from Greg</h2><p class="small" style="margin:6px 0 0;white-space:pre-wrap">${esc(j.site_notes)}</p></div>`:''}
+  ${crewPlanHtml(j)}
   <div class="card"><h2>Tasks</h2>${(j.tasks||[]).length?`<table style="margin-top:6px">${j.tasks.map(t=>`<tr><td><b class="small">${esc(t.task_type||'')}</b><div class="tiny muted">${esc(t.description||'')}${t.qty?` · ${t.qty} ${esc(t.unit||'')}`:''}</div></td><td class="num small">${t.start_date?fmtShort(t.start_date):''}</td></tr>`).join('')}</table>`:'<p class="small muted" style="margin:6px 0 0">No tasks listed.</p>'}</div>
   ${(j.issues||[]).length?`<div class="card"><h2>Open problems</h2>${j.issues.map(i=>`<div class="small" style="margin:6px 0"><span class="pill warn">${esc(i.category)}</span> ${esc(i.note)}</div>`).join('')}</div>`:''}
   <div class="card"><h2>Report a problem</h2><p class="small muted" style="margin:4px 0 0">Goes to Greg and onto the Monday toolbox list.</p>
@@ -967,6 +982,9 @@ async function viewJob(el){
    <div class="small" style="margin-top:6px">${j.clients?.phone?`<a href="tel:${esc(j.clients.phone)}" style="color:var(--green-2)">${esc(j.clients.phone)}</a> `:''}${j.clients?.email?`<a href="mailto:${esc(j.clients.email)}" style="color:var(--green-2)">${esc(j.clients.email)}</a>`:''}</div>
    ${stageBar(j.stage)}</div>
   ${timingCard(j)}
+  ${planCard(j)}
+  ${quoteCard(j)}
+  ${ordersCard(j)}
   <div class="card"><div class="row between"><h2>For the crew</h2><button class="btn light sm" id="cview">See what the crew see</button></div>
    <label for="sn">Notes the crew can see: access, gate codes, what to bring</label><textarea id="sn" style="min-height:70px">${esc(j.site_notes||'')}</textarea>
    <button class="btn light sm" id="snsave" style="margin-top:8px">Save</button>
@@ -1009,12 +1027,12 @@ async function viewJob(el){
    <button class="btn light sm" id="resched" style="margin-top:8px">Save</button></div>
 
   <div class="card"><div class="row between"><h2>Quote lines for Xero</h2><button class="btn light sm" id="copy">Copy</button></div>
-   <pre id="xero" class="small" style="white-space:pre-wrap;font-family:inherit;margin:8px 0 0">${esc(xeroLines(j,ts))}</pre></div>
+   <pre id="xero" class="small" style="white-space:pre-wrap;font-family:inherit;margin:8px 0 0">${esc(linesFor(j.id).length?quoteXero(j):xeroLines(j,ts))}</pre></div>
   ${(att||[]).length?`<div class="card"><h2>Notebook pages and drawings</h2><div class="thumbs" id="atts" style="margin-top:8px"></div></div>`:''}
   ${j.notes?`<div class="card"><h3>Notes</h3><p class="small muted" style="margin:6px 0 0;white-space:pre-wrap">${esc(j.notes)}</p></div>`:''}`;
 
   $('#back').onclick=()=>go('jobs');
-  bindTiming(el,j);
+  bindTiming(el,j);bindPlan(el,j);bindQuoteOrders(el,j);
   $('#cview').onclick=()=>go('cjob',j.id);
   $('#snsave').onclick=async()=>{const {error}=await sb.from('jobs').update({site_notes:$('#sn').value||null}).eq('id',j.id);if(error)return toast(S.dbReady?error.message:'Needs the database update first');j.site_notes=$('#sn').value;toast('Saved for the crew')};
   el.querySelectorAll('[data-stage]').forEach(b=>b.onclick=()=>setStage(j,b.dataset.stage,ts));
@@ -1062,6 +1080,9 @@ function bindTiming(el,j){
     const {error}=await sb.from('jobs').update({promised_weeks_min:a,promised_weeks_max:a?Math.max(a,b):null,promised_on:a?$('#pon').value:null}).eq('id',j.id);
     if(error)return toast(S.dbReady?error.message:'Needs the database update first');await loadAll();toast(a?'Promise saved. It shows on the board.':'Promise cleared');render()});
 }
+function quoteXero(j){const q=quoteCalc(j);const lines=[`${j.clients?.name||''} · ${[j.address,j.suburb].filter(Boolean).join(', ')}`,j.title||''];
+  for(const l of q.ls)lines.push(`${l.item}${l.description?' · '+l.description:''}${l.qty?` (${l.qty} ${l.unit||''})`:''}  ${money(lineSell(l),2)}`);
+  lines.push('',`Subtotal ${money(q.sell,2)}   GST ${money(q.gst,2)}   Total ${money(q.inc,2)}`);const dp=+(j.deposit_pct??S.settings.deposit_pct??0);if(dp)lines.push(`Deposit ${dp}%: ${money(q.inc*dp/100,2)} inc GST`);return lines.join('\n')}
 function xeroLines(j,ts){const rate=+S.settings.labour_rate||0;const lines=[`${j.clients?.name||''} · ${[j.address,j.suburb].filter(Boolean).join(', ')}`,j.title||'',''];let sub=0;
   for(const t of ts){const price=t.sell_price??(rate&&t.est_hours?(+t.est_hours)*rate:null);if(price)sub+=+price;
     lines.push(`${t.task_type}${t.description?' · '+t.description:''}${t.qty?` (${t.qty} ${t.unit||''})`:''}  ${price?money(price,2):'price TBC'}`)}
@@ -1084,20 +1105,282 @@ async function viewRates(el){
    <div class="split"><div><label for="rd">Reply to an enquiry within (days)</label><input id="rd" inputmode="numeric" value="${S.settings.reply_due_days??2}"></div><div><label for="qdd">Quote within (days)</label><input id="qdd" inputmode="numeric" value="${S.settings.quote_due_days??7}"></div></div>
    <div class="split"><div><label for="pwd">Warn before a promised window opens (days)</label><input id="pwd" inputmode="numeric" value="${S.settings.promise_warn_days??14}"></div><div><label for="brk">Unpaid break on a full day (minutes)</label><input id="brk" inputmode="numeric" value="${S.settings.break_minutes??30}"></div></div>
    <button class="btn light sm" id="ts" style="margin-top:10px">Save</button></div>
+  ${quoteSettingsHtml()}
   <div class="card"><h2>Crew</h2><p class="small muted" style="margin:4px 0 8px">Charge per day drives the numbers. Add what each person costs Greg to see true margin.</p>
    <table><thead><tr><th>Name</th><th class="num">Charge/day</th><th class="num">Cost/day</th></tr></thead><tbody>
    ${S.crew.map(c=>`<tr><td class="small">${esc(c.name)}</td><td class="num" style="width:100px"><input data-crew="${c.id}" data-k="charge_per_day" value="${c.charge_per_day??''}" inputmode="decimal" style="text-align:right"></td><td class="num" style="width:100px"><input data-crew="${c.id}" data-k="cost_per_day" value="${c.cost_per_day??''}" inputmode="decimal" style="text-align:right" placeholder="?"></td></tr>`).join('')}
    </tbody></table><div class="row" style="margin-top:8px;gap:8px"><input id="nc" placeholder="New crew member"><button class="btn light sm" id="ncadd">Add</button></div></div>
-  <div class="card"><h2>Time and price per unit</h2><table style="margin-top:6px"><thead><tr><th>Item</th><th>Unit</th><th class="num">Hrs</th><th class="num">Price</th></tr></thead><tbody>
-   ${S.rates.map(r=>`<tr><td class="small">${esc(r.task_type)}${r.samples?` <span class="pill">${r.samples} jobs</span>`:''}</td><td class="small muted">${esc(r.unit)}</td><td class="num" style="width:70px"><input data-rid="${r.id}" data-k="hours_per_unit" value="${r.hours_per_unit??''}" inputmode="decimal" style="text-align:right"></td><td class="num" style="width:84px"><input data-rid="${r.id}" data-k="sell_rate_per_unit" value="${r.sell_rate_per_unit??''}" inputmode="decimal" style="text-align:right"></td></tr>`).join('')}
-   </tbody></table></div>
+  <div class="card"><h2>Price book</h2><p class="small muted" style="margin:4px 0 0">Time per unit, what it costs Beck’s, what the client pays and who supplies it. Quotes pull from here.</p><div style="overflow-x:auto"><table style="margin-top:6px;min-width:600px"><thead><tr><th>Item</th><th>Unit</th><th class="num">Hrs</th><th class="num">Cost</th><th class="num">Price</th><th>Supplier</th></tr></thead><tbody>
+   ${S.rates.map(r=>`<tr><td class="small">${esc(r.task_type)}${r.samples?` <span class="pill">${r.samples} jobs</span>`:''}</td><td class="small muted">${esc(r.unit)}</td><td class="num" style="width:70px"><input data-rid="${r.id}" data-k="hours_per_unit" value="${r.hours_per_unit??''}" inputmode="decimal" style="text-align:right"></td><td class="num" style="width:84px"><input data-rid="${r.id}" data-k="material_cost_per_unit" value="${r.material_cost_per_unit??''}" inputmode="decimal" style="text-align:right" placeholder="cost"></td><td class="num" style="width:84px"><input data-rid="${r.id}" data-k="sell_rate_per_unit" value="${r.sell_rate_per_unit??''}" inputmode="decimal" style="text-align:right"></td><td style="width:140px"><input data-rid="${r.id}" data-k="supplier" data-text="1" value="${esc(r.supplier||'')}" list="sups2"></td></tr>`).join('')}
+   </tbody></table></div><datalist id="sups2">${(S.suppliers||[]).map(x=>`<option value="${esc(x.name)}">`).join('')}</datalist></div>
   <div class="card"><h2>What it learned</h2>${(log||[]).length?`<table style="margin-top:6px">${log.map(l=>`<tr><td class="small">${esc(l.task_type)}<div class="tiny muted">est ${r1(l.est_hours)}h, actual ${r1(l.actual_hours)}h</div></td><td class="num small">${l.old_hours_per_unit==null?'new':Math.round(l.old_hours_per_unit*100)/100+' →'} <b>${Math.round(l.new_hours_per_unit*100)/100}</b></td></tr>`).join('')}</table>`:'<p class="small muted">Nothing yet. Finish a job with actual hours on its tasks.</p>'}</div>`;
   $('#back').onclick=()=>go('nums');
   $('#ts').onclick=async()=>{const p={reply_due_days:+$('#rd').value||2,quote_due_days:+$('#qdd').value||7,promise_warn_days:+$('#pwd').value||14,break_minutes:$('#brk').value===''?30:+$('#brk').value};const {error}=await sb.from('settings').update(p).eq('id',1);if(error)return toast(S.dbReady?error.message:'Needs the database update first');Object.assign(S.settings,p);toast('Saved')};
   $('#ss').onclick=async()=>{const p={labour_rate:+$('#lr').value||null,hours_per_day:+$('#hpd').value||8,default_crew:+$('#dc').value||2};await sb.from('settings').update(p).eq('id',1);Object.assign(S.settings,p);toast('Saved');render()};
   el.querySelectorAll('[data-crew]').forEach(i=>i.onchange=async()=>{await sb.from('crew').update({[i.dataset.k]:i.value===''?null:+i.value}).eq('id',i.dataset.crew);toast('Saved');await loadAll()});
   $('#ncadd').onclick=async()=>{const n=$('#nc').value.trim();if(!n)return;await sb.from('crew').insert({name:n,charge_per_day:DAY_RATE()});await loadAll();render()};
-  el.querySelectorAll('[data-rid]').forEach(i=>i.onchange=async()=>{await sb.from('rates').update({[i.dataset.k]:i.value===''?null:+i.value,updated_at:new Date().toISOString()}).eq('id',i.dataset.rid);toast('Saved')});
+  el.querySelectorAll('[data-rid]').forEach(i=>i.onchange=async()=>{const v=i.dataset.text?(i.value.trim()||null):(i.value===''?null:+i.value);const {error}=await sb.from('rates').update({[i.dataset.k]:v,updated_at:new Date().toISOString()}).eq('id',i.dataset.rid);toast(error?error.message:'Saved');const r=S.rates.find(x=>x.id===i.dataset.rid);if(r)r[i.dataset.k]=v});
+  bindQuoteSettings(el);
+}
+
+/* ---------- v3: day plan, quote builder, supplier orders ---------- */
+const MK=()=>+(S.settings.default_markup_pct??25);
+const plural=(n,a,b)=>n===1?a:b;
+const planFor=id=>(S.plan||[]).filter(d=>d.job_id===id).sort((a,b)=>a.day_no-b.day_no);
+const linesFor=id=>(S.qlines||[]).filter(l=>l.job_id===id).sort((a,b)=>a.seq-b.seq);
+const ordersFor=id=>(S.orders||[]).filter(o=>o.job_id===id);
+const KINDS=['Labour','Materials','Plant and hire','Subcontractor','Other'];
+const lineSell=l=>{const q=+l.qty||0;if(l.unit_price!=null&&l.unit_price!=='')return q*(+l.unit_price);return q*(+l.unit_cost||0)*(1+((l.markup_pct??MK())/100))};
+const lineCost=l=>(+l.qty||0)*(+l.unit_cost||0);
+function quoteCalc(j){const ls=linesFor(j.id);const sell=ls.reduce((a,l)=>a+lineSell(l),0),cost=ls.reduce((a,l)=>a+lineCost(l),0);
+  const by=k=>ls.filter(l=>l.kind===k).reduce((a,l)=>a+lineSell(l),0);const noCost=ls.filter(l=>l.unit_cost==null||l.unit_cost==='').length;
+  const gst=sell*(S.settings.gst_rate??.1);const crewDays=ls.filter(l=>l.kind==='Labour').reduce((a,l)=>a+(+l.qty||0),0);
+  return{ls,sell,cost,profit:sell-cost,margin:sell?(sell-cost)/sell:null,gst,inc:sell+gst,labour:by('Labour'),mats:by('Materials'),plant:by('Plant and hire'),subs:by('Subcontractor'),crewDays,noCost}}
+function quoteState(j){if(j.quote_accepted_at)return['good',`Accepted by ${esc(j.quote_accepted_name||'client')} ${fmtShort(String(j.quote_accepted_at).slice(0,10))}`];
+  if(j.quote_viewed_at)return['warn',`Client opened it ${fmtShort(String(j.quote_viewed_at).slice(0,10))}`];
+  if(j.quote_sent_at)return['grey',`Sent ${fmtShort(String(j.quote_sent_at).slice(0,10))}, not opened yet`];return['grey','Draft']}
+const dayDate=(j,d)=>d.work_date||(j.start_date?iso(addWorkDays(parse(j.start_date),d.day_no)):null);
+const quoteUrl=j=>`${location.origin}/quote/?t=${j.quote_token}`;
+
+/* local fallback when the plan reader is offline: split on "day one", "day 2" */
+function localPlan(text){const W={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,first:1,second:2,third:3,fourth:4,fifth:5};
+  const parts=text.split(/\bday\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten|first|second|third|fourth|fifth)\b[\s,:.-]*/i);const days=[];
+  for(let i=1;i<parts.length;i+=2){const n=+parts[i]||W[parts[i].toLowerCase()]||days.length+1;const steps=parts[i+1].split(/,|\.|\bthen\b|\band then\b/i).map(s=>s.trim()).filter(s=>s.length>2);
+    days.push({day_no:n,title:steps[0]?steps[0][0].toUpperCase()+steps[0].slice(1):'Day '+n,steps:steps.map(s=>s[0].toUpperCase()+s.slice(1))})}
+  return{days,tools:[],est_days:days.length||null}}
+
+function planCard(j){
+  const ds=planFor(j.id),tools=j.tools||[];
+  if(S.v3===false)return `<div class="card"><h2>Job plan</h2><p class="small muted" style="margin:6px 0 0">Day by day plans, tools, quotes and supplier orders switch on once the database update has run.</p></div>`;
+  return `<div class="card" id="plancard"><div class="row between"><h2>Job plan</h2><span class="small muted">${j.est_days?r1(j.est_days)+' days':ds.length?ds.length+' days':''}${j.crew_size?' · '+j.crew_size+' crew':''}</span></div>
+   <div style="margin-top:10px"><b class="small">Tools and plant</b><div class="chips" id="tools" style="margin-top:6px">${tools.map((t,i)=>`<span class="chip on" style="display:inline-flex;gap:6px;align-items:center">${esc(t)}<button data-tdel="${i}" aria-label="Remove ${esc(t)}" style="border:0;background:none;cursor:pointer;font-size:15px;line-height:1;color:inherit">×</button></span>`).join('')||'<span class="small muted">None yet</span>'}</div>
+    <div class="row" style="gap:8px;margin-top:8px"><input id="tnew" placeholder="Add a tool, e.g. 1.7t excavator"><button class="btn light sm" id="tadd">Add</button></div></div>
+   <div style="margin-top:14px">${ds.map(d=>{const dt=dayDate(j,d);return `<div class="pday" data-did="${d.id}" style="border-top:1px solid #f1ede3;padding:10px 0">
+     <div class="row between"><b class="small">Day ${d.day_no}${dt?` · ${fmtD(dt)}`:''}</b><button class="btn light sm" data-dedit="${d.id}">Edit</button></div>
+     <div class="small" style="margin-top:2px">${esc(d.title||'')}</div>
+     ${(d.steps||[]).length?`<ul class="small muted" style="margin:6px 0 0;padding-left:18px">${d.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ul>`:''}
+     ${(d.tools||[]).length?`<div class="tiny muted" style="margin-top:4px">Bring: ${d.tools.map(esc).join(', ')}</div>`:''}</div>`}).join('')||'<p class="small muted" style="margin:0">No plan yet. Talk it through below, day by day.</p>'}</div>
+   <div style="margin-top:12px;padding-top:12px;border-top:1px solid #f1ede3"><b class="small">Talk the plan through</b>
+    <p class="tiny muted" style="margin:2px 0 6px">e.g. Day one dig out, levelling, solenoid check, start the retaining wall. Day two finish the wall and backfill. Need the 1.7 tonne excavator and plate compactor.</p>
+    <textarea id="ptx" data-mic style="min-height:80px" placeholder="Tap the mic and talk it through">${esc(j.plan_transcript||'')}</textarea>
+    <div class="row" style="gap:8px;margin-top:8px"><button class="btn sm" id="pbuild">Build the plan</button><button class="btn light sm" id="padd">+ Add a day</button></div>
+    <div id="pprev"></div></div></div>`}
+
+function bindPlan(el,j){
+  if(!$('#plancard'))return;
+  const saveTools=async tools=>{const {error}=await sb.from('jobs').update({tools}).eq('id',j.id);if(error)return toast(error.message);j.tools=tools;render()};
+  el.querySelectorAll('[data-tdel]').forEach(b=>b.onclick=()=>saveTools((j.tools||[]).filter((_,i)=>i!==+b.dataset.tdel)));
+  $('#tadd').onclick=()=>{const t=$('#tnew').value.trim();if(t)saveTools([...(j.tools||[]),t])};
+  $('#tnew').onkeydown=e=>{if(e.key==='Enter')$('#tadd').click()};
+  $('#padd').onclick=async()=>{const n=planFor(j.id).length+1;const {error}=await sb.from('job_plan_days').insert({job_id:j.id,day_no:n,title:'Day '+n,steps:[]});if(error)return toast(error.message);await loadAll();render()};
+  el.querySelectorAll('[data-dedit]').forEach(b=>b.onclick=()=>{const d=planFor(j.id).find(x=>x.id===b.dataset.dedit);const box=el.querySelector(`.pday[data-did="${d.id}"]`);
+    box.innerHTML=`<div class="split"><div><label>Day</label><input id="de_n" inputmode="numeric" value="${d.day_no}"></div><div><label>Date (optional)</label><input id="de_d" type="date" value="${d.work_date||''}"></div></div>
+     <label>Headline</label><input id="de_t" value="${esc(d.title||'')}"><label>Steps, one per line</label><textarea id="de_s" data-mic style="min-height:90px">${esc((d.steps||[]).join('\n'))}</textarea>
+     <label>Bring</label><input id="de_tools" value="${esc((d.tools||[]).join(', '))}" placeholder="Comma between tools">
+     <div class="row" style="gap:8px;margin-top:8px"><button class="btn sm" id="de_save">Save</button><button class="btn light sm" id="de_del">Delete day</button></div>`;
+    $('#de_save').onclick=async()=>{const p={day_no:+$('#de_n').value||d.day_no,work_date:$('#de_d').value||null,title:$('#de_t').value.trim(),steps:$('#de_s').value.split('\n').map(s=>s.trim()).filter(Boolean),tools:$('#de_tools').value.split(',').map(s=>s.trim()).filter(Boolean)};
+      const {error}=await sb.from('job_plan_days').update(p).eq('id',d.id);if(error)return toast(error.message);await loadAll();toast('Saved');render()};
+    $('#de_del').onclick=async()=>{await sb.from('job_plan_days').delete().eq('id',d.id);await loadAll();toast('Day removed');render()};
+    });
+  $('#pbuild').onclick=async()=>{const tx=$('#ptx').value.trim();if(!tx)return toast('Talk it through first');$('#pbuild').disabled=true;$('#pbuild').textContent='Reading it…';
+    let plan=null,msg=null;try{const {data,error}=await sb.functions.invoke('parse-plan',{body:{transcript:tx,job_id:j.id}});plan=data?.plan||null;msg=data?.error||null;if(error&&!plan)msg=msg||'offline'}catch(e){msg='offline'}
+    if(!plan){plan=localPlan(tx);if(!plan.days.length){$('#pbuild').disabled=false;$('#pbuild').textContent='Build the plan';return toast('Say it day by day, e.g. "Day one dig out"')}}
+    $('#pbuild').disabled=false;$('#pbuild').textContent='Build the plan';
+    S.planDraft={plan,tx};
+    $('#pprev').innerHTML=`<div class="card" style="margin:12px 0 0;background:var(--green-xl,#eef3f3)"><b class="small">Check it, then save</b>${msg?`<p class="tiny muted" style="margin:4px 0 0">Read on the phone, not the full reader. Check the steps.</p>`:''}
+     ${(plan.questions||[]).map(q=>`<div class="q">${esc(q)}</div>`).join('')}
+     <p class="small" style="margin:6px 0">${plan.est_days?`<b>${r1(plan.est_days)} days</b>`:''}${plan.crew_size?` · ${plan.crew_size} crew`:''}${(plan.tools||[]).length?` · Tools: ${plan.tools.map(esc).join(', ')}`:''}</p>
+     ${plan.days.map(d=>`<div style="margin:6px 0"><b class="small">Day ${d.day_no}: ${esc(d.title||'')}</b>${(d.steps||[]).length?`<ul class="small muted" style="margin:2px 0 0;padding-left:18px">${d.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ul>`:''}</div>`).join('')}
+     <div class="row" style="gap:8px;margin-top:8px"><button class="btn sm" id="psave">${planFor(j.id).length?'Replace the plan':'Save the plan'}</button><button class="btn light sm" id="pcancel">Cancel</button></div></div>`;
+    $('#pcancel').onclick=()=>{S.planDraft=null;$('#pprev').innerHTML=''};
+    $('#psave').onclick=async()=>{const p=S.planDraft.plan;
+      await sb.from('job_plan_days').delete().eq('job_id',j.id);
+      const rows=p.days.map((d,i)=>({job_id:j.id,day_no:d.day_no||i+1,title:d.title||null,steps:d.steps||[],crew:d.crew||null,tools:d.tools||[]}));
+      if(rows.length){const {error}=await sb.from('job_plan_days').insert(rows);if(error)return toast(error.message)}
+      const patch={plan_transcript:S.planDraft.tx,est_days:p.est_days||rows.length||null};
+      if((p.tools||[]).length)patch.tools=[...new Set([...(j.tools||[]),...p.tools])];if(p.crew_size)patch.crew_size=p.crew_size;
+      await sb.from('jobs').update(patch).eq('id',j.id);S.planDraft=null;await loadAll();toast('Plan saved. The crew can see it.');render()}};
+}
+
+function quoteCard(j){
+  if(S.v3===false)return '';
+  const q=quoteCalc(j),[lvl,txt]=quoteState(j);
+  return `<div class="card"><div class="row between"><h2>Quote</h2><span class="pill ${lvl}">${txt}</span></div>
+   ${q.ls.length?`<div class="kpis" style="margin-top:10px">
+     <div class="kpi"><div class="eyebrow">Price inc GST</div><div class="v">${money(q.inc)}</div><div class="s">${money(q.sell)} ex GST</div></div>
+     <div class="kpi"><div class="eyebrow">Cost</div><div class="v">${money(q.cost)}</div><div class="s">${q.noCost?`${q.noCost} ${plural(q.noCost,'line has','lines have')} no cost yet`:'Labour, materials, plant'}</div></div>
+     <div class="kpi"><div class="eyebrow">Profit</div><div class="v" style="color:${q.profit<0?'var(--bad)':'var(--good)'}">${money(q.profit)}</div><div class="s">${q.margin!=null?pct(q.margin)+' margin':''}</div></div></div>`
+   :'<p class="small muted" style="margin:6px 0 0">Build it from the price book: labour from the plan, materials with supplier cost and markup, plant hire.</p>'}
+   <button class="btn sm" id="toquote" style="margin-top:10px">${q.ls.length?'Open the quote':'Build the quote'}</button></div>`}
+
+function ordersCard(j){
+  if(S.v3===false)return '';
+  const os=ordersFor(j.id),q=quoteCalc(j),orderable=q.ls.filter(l=>['Materials','Plant and hire'].includes(l.kind));
+  if(!os.length&&!orderable.length)return '';
+  const st={Draft:'grey',Ordered:'warn',Delivered:'good',Invoiced:'good'};
+  return `<div class="card"><div class="row between"><h2>Supplier orders</h2>${orderable.length?`<button class="btn light sm" id="mkorders">${os.length?'Rebuild drafts':'Make orders from the quote'}</button>`:''}</div>
+   ${os.length?os.map(o=>`<div style="border-top:1px solid #f1ede3;padding:10px 0;margin-top:8px"><div class="row between"><b class="small">${esc(o.supplier)}</b><span class="pill ${st[o.status]}">${o.status}</span></div>
+     <ul class="small muted" style="margin:6px 0 0;padding-left:18px">${(o.lines||[]).map(l=>`<li>${esc(l.item)}${l.qty?` · ${l.qty} ${esc(l.unit||'')}`:''}</li>`).join('')}</ul>
+     <div class="tiny muted" style="margin-top:4px">Est cost ${money(o.total||0)}${o.needed_by?` · needed ${fmtShort(o.needed_by)}`:''}${o.invoiced_amount?` · invoiced ${money(o.invoiced_amount)}`:''}</div>
+     <div class="row wrap" style="gap:6px;margin-top:8px"><button class="btn light sm" data-ocopy="${o.id}">Copy order</button>
+      ${o.status==='Draft'?`<button class="btn sm" data-ost="${o.id}" data-to="Ordered">Mark ordered</button>`:''}
+      ${o.status==='Ordered'?`<button class="btn sm" data-ost="${o.id}" data-to="Delivered">Mark delivered</button>`:''}
+      ${o.status==='Delivered'?`<input data-oinv="${o.id}" placeholder="Supplier invoice $" inputmode="decimal" style="width:150px"><button class="btn light sm" data-oinvgo="${o.id}">Save invoice</button>`:''}</div></div>`).join('')
+   :'<p class="small muted" style="margin:6px 0 0">Groups the materials and hire on the quote by supplier, ready to order.</p>'}</div>`}
+
+function orderText(j,o){const sup=(S.suppliers||[]).find(s=>s.name===o.supplier);
+  return [`Hi ${o.supplier},`,'',`Order for Beck’s Landscaping, job ${j.job_no||''} in ${j.suburb||''}.`,
+   `Deliver to: ${[j.address,j.suburb].filter(Boolean).join(', ')}`,o.needed_by?`Needed by: ${fmtD(o.needed_by)}`:'',sup?.account_no?`Account: ${sup.account_no}`:'','',
+   ...(o.lines||[]).map(l=>`${l.qty?l.qty+' '+(l.unit||'')+' ':''}${l.item}`),'','Please confirm price and delivery.','Thanks,','Greg Beck · 0438 456 320'].filter((x,i,a)=>x!==''||a[i-1]!=='').join('\n')}
+
+function bindQuoteOrders(el,j){
+  $('#toquote')&&($('#toquote').onclick=()=>go('quote',j.id));
+  $('#mkorders')&&($('#mkorders').onclick=async()=>{const q=quoteCalc(j),os=ordersFor(j.id);
+    if(os.some(o=>o.status!=='Draft'))return toast('Some orders are placed already. Edit those by hand.');
+    if(os.length)await sb.from('purchase_orders').delete().eq('job_id',j.id);
+    const g={};q.ls.filter(l=>['Materials','Plant and hire'].includes(l.kind)).forEach(l=>{const k=l.supplier||'No supplier set';(g[k]=g[k]||[]).push(l)});
+    const rows=Object.entries(g).map(([s,ls])=>({job_id:j.id,supplier:s,status:'Draft',needed_by:j.start_date||null,lines:ls.map(l=>({item:l.item,qty:l.qty,unit:l.unit,unit_cost:l.unit_cost})),total:Math.round(ls.reduce((a,l)=>a+lineCost(l),0)*100)/100}));
+    const {error}=await sb.from('purchase_orders').insert(rows);if(error)return toast(error.message);await loadAll();toast(`${rows.length} ${plural(rows.length,'order','orders')} drafted`);render()});
+  el.querySelectorAll('[data-ocopy]').forEach(b=>b.onclick=()=>{const o=ordersFor(j.id).find(x=>x.id===b.dataset.ocopy);navigator.clipboard?.writeText(orderText(j,o)).then(()=>toast('Copied. Paste into email or text.'))});
+  el.querySelectorAll('[data-ost]').forEach(b=>b.onclick=async()=>{const p={status:b.dataset.to};if(b.dataset.to==='Ordered')p.ordered_at=new Date().toISOString();if(b.dataset.to==='Delivered')p.delivered_at=new Date().toISOString();
+    await sb.from('purchase_orders').update(p).eq('id',b.dataset.ost);await loadAll();toast(b.dataset.to);render()});
+  el.querySelectorAll('[data-oinvgo]').forEach(b=>b.onclick=async()=>{const id=b.dataset.oinvgo,a=+el.querySelector(`[data-oinv="${id}"]`).value;if(!a)return toast('Add the invoice amount');const o=ordersFor(j.id).find(x=>x.id===id);
+    await sb.from('purchase_orders').update({status:'Invoiced',invoiced_amount:a}).eq('id',id);
+    await sb.from('job_costs').insert({job_id:j.id,item:'Supplier invoice',supplier:o.supplier,amount:a});await loadAll();toast('Saved. Profit now uses the real cost.');render()});
+}
+
+/* ---------- quote builder (Greg and Kaitlin) ---------- */
+function viewQuote(el){
+  if(!isStaff())return go(isMkt()?'board':'site');
+  const j=S.jobs.find(x=>x.id===S.jobId);if(!j)return go('jobs');
+  const q=quoteCalc(j),[lvl,txt]=quoteState(j),ds=planFor(j.id);
+  const vu=j.quote_valid_until||iso(addDays(today0(),+(S.settings.quote_valid_days??30)));
+  const row=l=>`<tr data-lid="${l.id}">
+    <td><input data-k="item" value="${esc(l.item)}" list="pb"><input data-k="description" value="${esc(l.description||'')}" placeholder="Detail for the client" class="tiny" style="margin-top:4px;font-size:12px"></td>
+    <td class="num" style="width:84px"><input data-k="qty" value="${l.qty??''}" inputmode="decimal" style="text-align:right;display:block;width:100%"><input data-k="unit" value="${esc(l.unit||'')}" placeholder="unit" style="margin-top:4px;font-size:12px;text-align:right;display:block;width:100%"></td>
+    <td class="num" style="width:86px"><input data-k="unit_cost" value="${l.unit_cost??''}" inputmode="decimal" style="text-align:right" placeholder="cost"></td>
+    <td class="num" style="width:64px"><input data-k="markup_pct" value="${l.markup_pct??''}" inputmode="decimal" style="text-align:right" placeholder="${MK()}"></td>
+    <td class="num" style="width:90px"><input data-k="unit_price" value="${l.unit_price??''}" inputmode="decimal" style="text-align:right" placeholder="${l.unit_cost?r1((+l.unit_cost)*(1+((l.markup_pct??MK())/100))):'sell'}"></td>
+    <td class="num small" style="width:90px">${money(lineSell(l))}</td>
+    ${['Materials','Plant and hire','Subcontractor'].includes(l.kind)?`<td style="width:120px"><input data-k="supplier" value="${esc(l.supplier||'')}" list="sups" placeholder="Supplier"></td>`:'<td></td>'}
+    <td style="width:30px"><button class="btn light sm" data-ldel="${l.id}" style="padding:5px 9px" aria-label="Remove">×</button></td></tr>`;
+  el.innerHTML=`<div style="margin:18px 0 4px"><button class="btn light sm" id="back">‹ ${esc(j.clients?.name||'Job')}</button></div>
+  <div class="row between" style="margin:10px 0 6px;flex-wrap:wrap;gap:8px"><div><h1>Quote</h1><div class="small muted">${esc(j.clients?.name||'')} · ${esc(j.suburb||'')} · ${esc(j.quote_no||'Q'+j.job_no)}</div></div><span class="pill ${lvl}">${txt}</span></div>
+  <div class="tiles">
+   <div class="tile dark"><div class="eyebrow">Price</div><div class="v">${money(q.inc)}</div><div class="s">${money(q.sell)} ex GST</div><div class="src">What the client sees</div></div>
+   <div class="tile"><div class="eyebrow">Cost</div><div class="v">${money(q.cost)}</div><div class="s">${q.noCost?`${q.noCost} ${plural(q.noCost,'line','lines')} missing a cost`:'All lines costed'}</div><div class="src">Qty × unit cost</div></div>
+   <div class="tile"><div class="eyebrow">Profit</div><div class="v" style="color:${q.profit<0?'var(--bad)':'var(--good)'}">${money(q.profit)}</div><div class="s">${q.margin!=null?pct(q.margin)+' margin':'–'}</div><div class="src">Price less cost, ex GST</div></div>
+   <div class="tile"><div class="eyebrow">Crew days</div><div class="v">${r1(q.crewDays)}</div><div class="s">${ds.length?`Plan has ${ds.length} ${plural(ds.length,'day','days')}`:'No day plan yet'}</div><div class="src">Labour lines</div></div>
+  </div>
+  <datalist id="pb">${S.rates.map(r=>`<option value="${esc(r.task_type)}">`).join('')}</datalist>
+  <datalist id="sups">${(S.suppliers||[]).map(s=>`<option value="${esc(s.name)}">`).join('')}</datalist>
+  ${KINDS.map(k=>{const ls=q.ls.filter(l=>l.kind===k);return `<div class="card"><div class="row between"><h2>${k}</h2><span class="small muted">${money(ls.reduce((a,l)=>a+lineSell(l),0))}</span></div>
+    ${k==='Labour'?`<p class="tiny muted" style="margin:2px 0 6px">Charged at ${money(DAY_RATE())} a crew day. Cost is what the crew costs Greg.</p>`:''}
+    ${ls.length?`<div style="overflow-x:auto"><table style="margin-top:6px;min-width:720px"><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Cost each</th><th class="num">Markup %</th><th class="num">Sell each</th><th class="num">Line</th><th>${['Materials','Plant and hire','Subcontractor'].includes(k)?'Supplier':''}</th><th></th></tr></thead><tbody>${ls.map(row).join('')}</tbody></table></div>`:''}
+    <div class="row wrap" style="gap:8px;margin-top:8px"><button class="btn light sm" data-ladd="${k}">+ ${k==='Labour'?'Labour line':k==='Materials'?'Material':k==='Plant and hire'?'Hire item':k==='Subcontractor'?'Subbie':'Line'}</button>
+     ${k==='Labour'?`<button class="btn light sm" id="labplan">Labour from the plan</button>`:''}</div></div>`}).join('')}
+  <div class="card"><h2>What the client reads</h2>
+   <label for="qi">Opening note</label><textarea id="qi" data-mic style="min-height:70px" placeholder="Thanks for having us out. Here's what we'll build and what it costs.">${esc(j.quote_intro||'')}</textarea>
+   <label for="qe">Not included</label><textarea id="qe" data-mic style="min-height:60px" placeholder="e.g. Electrical, council approvals, tree removal">${esc(j.quote_exclusions||'')}</textarea>
+   <div class="split"><div><label for="qv">Valid until</label><input id="qv" type="date" value="${vu}"></div><div><label for="qdp">Deposit %</label><input id="qdp" inputmode="decimal" value="${j.deposit_pct??S.settings.deposit_pct??30}"></div></div>
+   <button class="btn light sm" id="qsave" style="margin-top:10px">Save</button></div>
+  <div class="card"><h2>Send it</h2><p class="small muted" style="margin:4px 0 8px">Preview first. Mark it sent, then paste the link into a text or email to the client. They accept online and it lands here as Accepted. Deposit and final invoices still go from Xero.</p>
+   <div class="row wrap" style="gap:8px"><button class="btn light sm" id="qprev">Preview the quote</button><button class="btn sm" id="qsend">${j.quote_sent_at?'Copy the link again':'Mark sent and copy link'}</button><button class="btn light sm" id="qxero">Copy lines for Xero</button></div></div>`;
+  $('#back').onclick=()=>go('job',j.id);
+  const upd=async(id,k,v)=>{const num=['qty','unit_cost','markup_pct','unit_price'].includes(k);const val=num?(v===''?null:+v):v;
+    const {error}=await sb.from('quote_lines').update({[k]:val}).eq('id',id);if(error)return toast(error.message);const l=S.qlines.find(x=>x.id===id);if(l)l[k]=val};
+  el.querySelectorAll('tr[data-lid] input').forEach(inp=>inp.onchange=async()=>{const id=inp.closest('tr').dataset.lid,k=inp.dataset.k;
+    if(k==='item'){const r=S.rates.find(r=>r.task_type===inp.value);if(r){const l=S.qlines.find(x=>x.id===id);const p={item:r.task_type,unit:l.unit||r.unit};
+      if(l.unit_cost==null&&r.material_cost_per_unit!=null)p.unit_cost=+r.material_cost_per_unit;if(l.unit_price==null&&r.sell_rate_per_unit!=null&&r.material_cost_per_unit==null)p.unit_price=+r.sell_rate_per_unit;if(!l.supplier&&r.supplier)p.supplier=r.supplier;
+      await sb.from('quote_lines').update(p).eq('id',id);Object.assign(l,p);return render()}}
+    await upd(id,k,inp.value);if(k!=='description'&&k!=='supplier')render()});
+  el.querySelectorAll('[data-ldel]').forEach(b=>b.onclick=async()=>{await sb.from('quote_lines').delete().eq('id',b.dataset.ldel);S.qlines=S.qlines.filter(x=>x.id!==b.dataset.ldel);render()});
+  el.querySelectorAll('[data-ladd]').forEach(b=>b.onclick=async()=>{const k=b.dataset.ladd;const avgCost=()=>{const c=S.crew.filter(c=>c.cost_per_day);return c.length?c.reduce((a,c)=>a+(+c.cost_per_day),0)/c.length:null};
+    const base=k==='Labour'?{item:'Labour',unit:'crew days',unit_price:DAY_RATE(),unit_cost:avgCost(),qty:1}:{item:k==='Plant and hire'?'Hire':'New item',qty:1};
+    const {data,error}=await sb.from('quote_lines').insert({job_id:j.id,kind:k,seq:q.ls.length,...base}).select().single();if(error)return toast(error.message);S.qlines.push(data);render()});
+  $('#labplan').onclick=async()=>{const crew=j.crew_size||S.settings.default_crew||2;const days=j.est_days||planFor(j.id).length||r1(jobHours(tasksFor(j.id))/((S.settings.hours_per_day||8)*crew));
+    if(!days)return toast('Add a day plan or tasks first');const cd=Math.round(days*crew*10)/10;const c=S.crew.filter(c=>c.cost_per_day);const cost=c.length?c.reduce((a,c)=>a+(+c.cost_per_day),0)/c.length:null;
+    const ex=q.ls.find(l=>l.kind==='Labour'&&/^crew days?$/.test(l.unit||''));
+    if(ex){await sb.from('quote_lines').update({qty:cd}).eq('id',ex.id);ex.qty=cd}else{const {data,error}=await sb.from('quote_lines').insert({job_id:j.id,kind:'Labour',seq:q.ls.length,item:'Labour',description:`${days} days on site, ${crew} crew`,qty:cd,unit:'crew days',unit_price:DAY_RATE(),unit_cost:cost}).select().single();if(error)return toast(error.message);S.qlines.push(data)}
+    toast(`${cd} crew days`);render()};
+  const saveMeta=async extra=>{const p={quote_intro:$('#qi').value||null,quote_exclusions:$('#qe').value||null,quote_valid_until:$('#qv').value||null,deposit_pct:+$('#qdp').value||null,...(extra||{})};
+    const {error}=await sb.from('jobs').update(p).eq('id',j.id);if(error){toast(error.message);return false}Object.assign(j,p);return true};
+  $('#qsave').onclick=async()=>{if(await saveMeta())toast('Saved')};
+  const ensureToken=async()=>{if(j.quote_token)return true;return saveMeta({quote_token:crypto.randomUUID()})};
+  $('#qprev').onclick=async()=>{if(!q.ls.length)return toast('Add some lines first');if(await ensureToken())window.open(quoteUrl(j),'_blank')};
+  $('#qsend').onclick=async()=>{if(!q.ls.length)return toast('Add some lines first');if(q.sell<=0)return toast('The quote is $0. Check the prices.');
+    const first=!j.quote_sent_at;const p={quote_token:j.quote_token||crypto.randomUUID()};
+    if(first)Object.assign(p,{quote_sent_at:new Date().toISOString(),quote_date:iso(today0()),quote_no:j.quote_no||'Q'+j.job_no,quote_total:Math.round(q.inc*100)/100,quoted_labour:Math.round(q.labour*100)/100,quoted_materials:Math.round((q.mats+q.plant+q.subs)*100)/100,quoted_crew_days:q.crewDays||null,stage:['Lead','Design'].includes(j.stage)?'Quoted':j.stage});
+    if(!(await saveMeta(p)))return;if(first&&p.stage!==j.stage)await sb.from('checkpoints').insert({job_id:j.id,stage:'Quoted',note:'Quote sent from the hub'});
+    const fn=(j.clients?.name||'').split(/\s|&/)[0];const msg=`Hi ${fn}, here's your quote from Beck’s Landscaping: ${quoteUrl(j)}\nYou can accept it online. Any questions, call me on 0438 456 320.\nGreg`;
+    navigator.clipboard?.writeText(msg).then(()=>toast('Link and message copied. Paste into a text or email.'));await loadAll();render()};
+  $('#qxero').onclick=async()=>{await saveMeta();navigator.clipboard?.writeText(quoteXero(j)).then(()=>toast('Copied. Paste into Xero.'))};
+}
+
+/* ---------- crew view: plan and tools ---------- */
+function crewPlanHtml(j){
+  const plan=j.plan||[],tools=j.tools||[];if(!plan.length&&!tools.length)return '';
+  const dd=d=>d.work_date||(j.start_date?iso(addWorkDays(parse(j.start_date),d.day_no)):null);
+  return `${tools.length?`<div class="card"><h2>Bring</h2><div class="chips" style="margin-top:8px">${tools.map(t=>`<span class="chip on">${esc(t)}</span>`).join('')}</div></div>`:''}
+   ${plan.length?`<div class="card"><h2>Day by day</h2>${plan.map(d=>{const dt=dd(d);return `<div style="border-top:1px solid #f1ede3;padding:10px 0;margin-top:6px"><b class="small">Day ${d.day_no}${dt?` · ${fmtD(dt)}`:''}${dt===iso(today0())?' <span class="pill good">Today</span>':''}</b>
+     <div class="small" style="margin-top:2px">${esc(d.title||'')}</div>${(d.steps||[]).length?`<ul class="small muted" style="margin:6px 0 0;padding-left:18px">${d.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ul>`:''}
+     ${(d.tools||[]).length?`<div class="tiny muted" style="margin-top:4px">Bring: ${d.tools.map(esc).join(', ')}</div>`:''}</div>`}).join('')}</div>`:''}`}
+
+/* ---------- suppliers and quote settings (on Rates) ---------- */
+function quoteSettingsHtml(){
+  if(S.v3===false)return '';
+  return `<div class="card"><h2>Quotes</h2><div class="split"><div><label for="smk">Default markup on cost %</label><input id="smk" inputmode="decimal" value="${S.settings.default_markup_pct??25}"></div><div><label for="sdp">Deposit %</label><input id="sdp" inputmode="decimal" value="${S.settings.deposit_pct??30}"></div></div>
+   <label for="sqv">Quotes valid for (days)</label><input id="sqv" inputmode="numeric" value="${S.settings.quote_valid_days??30}">
+   <label for="sqt">Terms on every quote</label><textarea id="sqt" style="min-height:90px" placeholder="Deposit secures your start date. Balance on completion. Prices valid for 30 days.">${esc(S.settings.quote_terms||'')}</textarea>
+   <button class="btn light sm" id="sqsave" style="margin-top:10px">Save</button></div>
+  <div class="card"><h2>Suppliers</h2><p class="small muted" style="margin:4px 0 8px">Used on supplier orders. Add cost prices in the table below so quotes show real profit.</p>
+   <div style="overflow-x:auto"><table style="min-width:520px"><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Account</th></tr></thead><tbody>
+   ${(S.suppliers||[]).map(s=>`<tr>${['name','email','phone','account_no'].map(k=>`<td><input data-sup="${s.id}" data-k="${k}" value="${esc(s[k]||'')}"></td>`).join('')}</tr>`).join('')}</tbody></table></div>
+   <div class="row" style="gap:8px;margin-top:8px"><input id="supnew" placeholder="New supplier, e.g. Midland Brick"><button class="btn light sm" id="supadd">Add</button></div></div>`}
+function bindQuoteSettings(el){
+  if(!$('#sqsave'))return;
+  $('#sqsave').onclick=async()=>{const p={default_markup_pct:+$('#smk').value||0,deposit_pct:+$('#sdp').value||0,quote_valid_days:+$('#sqv').value||30,quote_terms:$('#sqt').value||null};const {error}=await sb.from('settings').update(p).eq('id',1);if(error)return toast(error.message);Object.assign(S.settings,p);toast('Saved')};
+  el.querySelectorAll('[data-sup]').forEach(i=>i.onchange=async()=>{const {error}=await sb.from('suppliers').update({[i.dataset.k]:i.value||null}).eq('id',i.dataset.sup);toast(error?error.message:'Saved');await loadAll()});
+  $('#supadd').onclick=async()=>{const n=$('#supnew').value.trim();if(!n)return;const {error}=await sb.from('suppliers').insert({name:n});if(error)return toast(error.message);await loadAll();render()};
+}
+
+
+/* ---------- marketing approvals: Lauren sends, Greg or Kaitlin approve ---------- */
+const CSTAT={Planned:'grey',Drafted:'grey','For approval':'warn',Changes:'bad',Approved:'good',Live:'good',Done:'grey'};
+function campOpts(c){if(isStaff())return ['Planned','Drafted','For approval','Changes','Approved','Live','Done'];
+  return ['Approved','Live','Done'].includes(c.status)?['Approved','Live','Done']:['Planned','Drafted','For approval',...(c.status==='Changes'?['Changes']:[])]}
+function campHtml(c){const canEdit=isStaff()||!['For approval'].includes(c.status);
+  return `<div class="camp ${c.goal!=='Brand'?'push':''}" data-camp="${c.id}"><div class="row between" style="gap:8px"><b class="small">${esc(c.title)}</b>
+   <select data-cid="${c.id}" style="width:auto;padding:3px 6px;font-size:12px">${campOpts(c).map(s=>`<option ${s===c.status?'selected':''}>${s}</option>`).join('')}</select></div>
+   <div class="tiny muted">${esc(c.channel)} · ${esc(c.goal)} · ${esc(c.owner||'')} · <span class="pill ${CSTAT[c.status]||'grey'}" style="font-size:10px">${esc(c.status)}</span></div>
+   ${c.detail?`<div class="small" style="margin-top:4px">${esc(c.detail)}</div>`:''}
+   ${c.copy?`<div class="small" style="margin-top:6px;padding:8px 10px;background:#fff;border-radius:8px;white-space:pre-wrap">${esc(c.copy)}</div>`:''}
+   ${c.asset_url?`<a class="tiny" href="${esc(c.asset_url)}" target="_blank" rel="noopener" style="color:var(--green-2)">Open the image or video</a>`:''}
+   ${c.status==='Changes'&&c.review_note?`<div class="small" style="margin-top:6px"><span class="pill bad">Changes</span> ${esc(c.reviewed_by||'')}: ${esc(c.review_note)}</div>`:''}
+   ${c.status==='Approved'&&c.reviewed_by?`<div class="tiny muted" style="margin-top:4px">Approved by ${esc(c.reviewed_by)} ${c.reviewed_at?fmtShort(String(c.reviewed_at).slice(0,10)):''}</div>`:''}
+   <div class="row wrap" style="gap:6px;margin-top:8px">
+    ${isStaff()&&c.status==='For approval'?`<button class="btn sm" data-capp="${c.id}">Approve</button><input data-cnote="${c.id}" placeholder="What to change" style="flex:1;min-width:140px"><button class="btn light sm" data-cchg="${c.id}">Ask for changes</button>`:''}
+    ${isMkt()&&['Planned','Drafted','Changes'].includes(c.status)?`<button class="btn sm" data-csend="${c.id}">Send for approval</button>`:''}
+    ${canEdit?`<button class="btn light sm" data-cedit="${c.id}">Edit</button>`:''}</div></div>`}
+function approvalsCard(){const wait=S.camps.filter(c=>c.status==='For approval'),chg=S.camps.filter(c=>c.status==='Changes'),ok=S.camps.filter(c=>c.status==='Approved');
+  if(!wait.length&&!chg.length&&!ok.length)return '';
+  return `<div class="card"><div class="row between"><h2>Approvals</h2><span class="small muted">${isStaff()?'Lauren sends, you approve':'Greg or Kaitlin approve'}</span></div>
+   <div class="kpis" style="margin-top:10px"><div class="kpi ${wait.length&&isStaff()?'alert':''}"><div class="eyebrow">Waiting</div><div class="v">${wait.length}</div><div class="s">${isStaff()?'Need your yes':'With Greg or Kaitlin'}</div></div>
+    <div class="kpi"><div class="eyebrow">Changes asked</div><div class="v">${chg.length}</div><div class="s">${isMkt()?'Back to you':'With Lauren'}</div></div>
+    <div class="kpi"><div class="eyebrow">Approved</div><div class="v">${ok.length}</div><div class="s">Ready to go live</div></div></div>
+   ${(isStaff()?wait:chg).slice(0,6).map(c=>campHtml(c)).join('')}</div>`}
+function bindCamps(el){
+  el.querySelectorAll('[data-cid]').forEach(s=>s.onchange=async()=>{const {data,error}=await sb.from('campaigns').update({status:s.value}).eq('id',s.dataset.cid).select().single();if(error){toast(error.message);return render()}const i=S.camps.findIndex(x=>x.id===data.id);if(i>=0)S.camps[i]=data;toast(data.status);render()});
+  const setC=async(id,p,msg)=>{const {data,error}=await sb.from('campaigns').update(p).eq('id',id).select().single();if(error)return toast(error.message);const i=S.camps.findIndex(x=>x.id===id);if(i>=0)S.camps[i]=data;toast(msg);render()};
+  el.querySelectorAll('[data-capp]').forEach(b=>b.onclick=()=>setC(b.dataset.capp,{status:'Approved',review_note:null},'Approved. Lauren can post it.'));
+  el.querySelectorAll('[data-cchg]').forEach(b=>b.onclick=()=>{const n=el.querySelector(`[data-cnote="${b.dataset.cchg}"]`).value.trim();if(!n)return toast('Say what to change');setC(b.dataset.cchg,{status:'Changes',review_note:n},'Sent back to Lauren')});
+  el.querySelectorAll('[data-csend]').forEach(b=>b.onclick=()=>setC(b.dataset.csend,{status:'For approval'},'Sent to Greg and Kaitlin'));
+  el.querySelectorAll('[data-cedit]').forEach(b=>b.onclick=()=>{const c=S.camps.find(x=>x.id===b.dataset.cedit);const box=el.querySelector(`[data-camp="${c.id}"]`);
+    box.innerHTML=`<label>Title</label><input id="ce_t" value="${esc(c.title)}"><label>Caption or copy</label><textarea id="ce_c" style="min-height:90px">${esc(c.copy||'')}</textarea>
+     <label>Link to the image or video (Drive, Canva)</label><input id="ce_a" value="${esc(c.asset_url||'')}" placeholder="https://">
+     <div class="row" style="gap:8px;margin-top:8px"><button class="btn sm" id="ce_s">Save</button>${isMkt()?'<button class="btn light sm" id="ce_sa">Save and send for approval</button>':''}</div>`;
+    const p=()=>({title:$('#ce_t').value.trim()||c.title,copy:$('#ce_c').value||null,asset_url:$('#ce_a').value.trim()||null});
+    $('#ce_s').onclick=()=>setC(c.id,p(),'Saved');$('#ce_sa')&&($('#ce_sa').onclick=()=>setC(c.id,{...p(),status:'For approval'},'Sent to Greg and Kaitlin'))});
 }
 
 /* ---------- me ---------- */
