@@ -262,6 +262,7 @@ async function loadAll(){
     q.issues=sb.from('issues').select('*').order('created_at',{ascending:false}).limit(300);
     q.plan=sb.from('job_plan_days').select('*').order('day_no');q.qlines=sb.from('quote_lines').select('*').order('seq');
     q.orders=sb.from('purchase_orders').select('*').order('created_at');q.suppliers=sb.from('suppliers').select('*').order('name');
+    q.alog=sb.from('automation_log').select('*').or(`needs_check.eq.true,created_at.gte.${new Date(Date.now()-14*864e5).toISOString()}`).order('created_at',{ascending:false}).limit(100);
   }else{
     // crew and marketing: board data with no money. Falls back to the tables until the database update has run.
     q.jobs=sb.rpc('board_jobs');q.tasks=sb.rpc('board_tasks');
@@ -274,7 +275,7 @@ async function loadAll(){
     if(k==='leads'&&r.error){S.leads=null;continue}
     if(k==='issues'&&r.error){S.issues=null;continue}
     if(k==='plan'){S.v3=!r.error;S.plan=r.data||[];continue}
-    if(['qlines','orders','suppliers'].includes(k)&&r.error){S[k]=[];continue}
+    if(['qlines','orders','suppliers','alog'].includes(k)&&r.error){S[k]=[];continue}
     S[k]=r.data||(k==='settings'?{}:[]);
   }
   S.dbReady=isStaff()?S.finSet!==null:true;
@@ -448,7 +449,7 @@ function viewToday(el){
   const apprW=(S.camps||[]).filter(c=>c.status==='For approval');
   if(apprW.length)needs.push(['warn',`${apprW.length} marketing ${plural(apprW.length,'post','posts')} to approve`,`From Lauren. ${apprW.slice(0,2).map(c=>esc(c.title)).join(' · ')}`,'mkt','Approve']);
   const accOnline=S.jobs.filter(j=>j.quote_accepted_at&&j.stage==='Accepted');
-  if(accOnline.length)needs.push(['info',`${accOnline.length} ${plural(accOnline.length,'quote','quotes')} accepted online`,`Raise the deposit in Xero and book a start. ${names(accOnline)}`,'job','Open',accOnline[0].id]);
+  if(accOnline.length)needs.push(['info',`${accOnline.length} ${plural(accOnline.length,'quote','quotes')} accepted online`,`Deposit invoice drafts in Xero overnight. Book a start. ${names(accOnline)}`,'job','Open',accOnline[0].id]);
   const toOrder=S.jobs.filter(j=>['Accepted','Deposit in'].includes(j.stage)&&(S.qlines||[]).some(l=>l.job_id===j.id&&['Materials','Plant and hire'].includes(l.kind))&&!ordersFor(j.id).some(o=>o.status!=='Draft'));
   if(toOrder.length)needs.push(['warn',`Order materials for ${toOrder.length} ${plural(toOrder.length,'job','jobs')}`,names(toOrder),'job','Order',toOrder[0].id]);
   if(quotesOut.length)needs.push(['warn',`${quotesOut.length} ${plural(quotesOut.length,'quote','quotes')} out over a week`,`Follow up. ${names(quotesOut)}`,'jobs','Open']);
@@ -486,6 +487,7 @@ function viewToday(el){
   <div class="today-grid">
    <div class="card"><div class="row between"><h2>Needs you</h2><span class="small muted">${needs.length}</span></div>
     ${needs.length?needs.map(([k,t,s,v,b,id])=>`<button class="need ${k==='warn'?'':k}" data-go="${v}"${id?` data-id="${id}"`:''}><span class="dot"></span><span class="txt"><b>${t}</b><span>${s}</span></span><span class="go">${b}</span></button>`).join(''):'<p class="small muted" style="margin:10px 0 0">Nothing needs you today.</p>'}</div>
+   ${toCheckCard()}
    <div class="card"><div class="row between"><h2>Promised start dates</h2><span class="small muted">${promised.length}</span></div>
     ${promised.length?promised.map(({j,p})=>`<button class="need ${pState[p.state][0]==='bad'?'bad':pState[p.state][0]==='warn'?'':'info'}" data-go="job" data-id="${j.id}"><span class="dot"></span><span class="txt"><b>${esc(nameOf(j))} · ${p.label}</b><span>${fmtShort(iso(p.from))} to ${fmtShort(iso(p.to))}. ${j.start_date?'Starts '+fmtD(j.start_date):'Not on the board'}</span></span><span class="pill ${pState[p.state][0]}">${pState[p.state][1]}</span></button>`).join(''):`<p class="small muted" style="margin:10px 0 0">When Greg tells a client "8 to 10 weeks", add it on the job. It shows here and on the board.</p>`}</div>
    <div class="card"><div class="row between"><h2>Where every job sits</h2><span class="small muted">${S.jobs.length} jobs</span></div>
@@ -493,6 +495,7 @@ function viewToday(el){
    <div class="card"><div class="row between"><h2>This week on site</h2><button class="btn light sm" data-go="board">Board</button></div>${weekList(live,monday(t0))}</div>
   </div>`;
   el.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>b.dataset.id?go('job',b.dataset.id):go(b.dataset.go));
+  bindToCheck(el);
 }
 
 /* ---------- money (Greg and Kaitlin only: their login is the lock) ---------- */
@@ -534,6 +537,18 @@ function viewJobs(el){
 }
 
 /* ---------- board: gantt + capacity ---------- */
+/* ---------- automation log: what ran overnight, Kaitlin ticks it off ---------- */
+const ACT={deposit_invoice:'Deposit invoice drafted',deposit_paid:'Deposit paid, job booked',final_invoice:'Final invoice drafted',final_paid:'Paid in full',review_draft:'Review email drafted for approval',note:'Note'};
+function toCheckCard(){
+  const log=S.alog||[];if(!log.length)return '';
+  const open=log.filter(l=>l.needs_check&&!l.checked_at),done=log.filter(l=>!(l.needs_check&&!l.checked_at)).slice(0,5);
+  const row=l=>{const j=S.jobs.find(x=>x.id===l.job_id);return `<div class="row between" style="padding:7px 0;border-bottom:1px solid var(--line);gap:8px"><div class="small" style="min-width:0"><b>${esc(ACT[l.action]||l.action)}${j?` · ${esc(nameOf(j))}`:''}</b><div class="tiny muted">${fmtShort(String(l.created_at).slice(0,10))}${l.amount!=null?` · ${money(l.amount)} ex GST`:''}${l.ref?` · ${esc(l.ref)}`:''}${l.detail?` · ${esc(l.detail)}`:''}</div></div>${l.checked_at?'<span class="pill good">Checked</span>':`<button class="btn light sm" data-chk="${l.id}">Checked</button>`}</div>`};
+  return `<div class="card"><div class="row between"><h2>To check</h2><span class="small muted">${open.length} to tick</span></div>
+   <p class="tiny muted" style="margin:4px 0 6px">What the overnight automation did in Xero and Gmail. Tick each one once you've looked at it.</p>
+   ${open.length?open.map(row).join(''):'<p class="small muted" style="margin:6px 0">Nothing waiting on you.</p>'}
+   ${done.length?`<div class="tiny muted" style="margin-top:8px">Recently checked</div>${done.map(row).join('')}`:''}</div>`}
+function bindToCheck(el){el.querySelectorAll('[data-chk]').forEach(b=>b.onclick=async()=>{b.disabled=true;const {error}=await sb.from('automation_log').update({checked_at:new Date().toISOString(),checked_by:S.profile.id}).eq('id',b.dataset.chk);if(error){b.disabled=false;return toast(error.message)}const l=(S.alog||[]).find(x=>x.id===b.dataset.chk);if(l)l.checked_at=new Date().toISOString();toast('Checked');render()})}
+
 function viewBoard(el){
   const t0=today0(),cut=iso(new Date(t0.getTime()-14*864e5));
   const rows=S.jobs.map(j=>({j,p:promiseOf(j)})).filter(({j,p})=>(j.start_date&&j.end_date&&!['Lost','Paid'].includes(j.stage)&&j.end_date>=cut)||(p&&p.state!=='done'))
