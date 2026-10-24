@@ -1291,7 +1291,7 @@ function viewQuote(el){
     const {error}=await sb.from('quote_lines').update({[k]:val}).eq('id',id);if(error)return toast(error.message);const l=S.qlines.find(x=>x.id===id);if(l)l[k]=val};
   el.querySelectorAll('tr[data-lid] input').forEach(inp=>inp.onchange=async()=>{const id=inp.closest('tr').dataset.lid,k=inp.dataset.k;
     if(k==='item'){const r=S.rates.find(r=>r.task_type===inp.value);if(r){const l=S.qlines.find(x=>x.id===id);const p={item:r.task_type,unit:l.unit||r.unit};
-      if(l.unit_cost==null&&r.material_cost_per_unit!=null)p.unit_cost=+r.material_cost_per_unit;if(l.unit_price==null&&r.sell_rate_per_unit!=null&&r.material_cost_per_unit==null)p.unit_price=+r.sell_rate_per_unit;if(!l.supplier&&r.supplier)p.supplier=r.supplier;
+      const rc=r.material_cost_per_unit!=null?+r.material_cost_per_unit:null,rs=r.sell_rate_per_unit!=null?+r.sell_rate_per_unit:null;if(l.unit_cost==null&&rc!=null){p.unit_cost=rc;if(rs&&l.markup_pct==null)p.markup_pct=Math.round((rs/rc-1)*1000)/10}if(l.unit_price==null&&rs!=null&&rc==null)p.unit_price=rs;if(!l.supplier&&r.supplier)p.supplier=r.supplier;if(!l.description&&r.notes&&/sell rate from Xero/.test(r.notes))p.description=null;
       await sb.from('quote_lines').update(p).eq('id',id);Object.assign(l,p);return render()}}
     await upd(id,k,inp.value);if(k!=='description'&&k!=='supplier')render()});
   el.querySelectorAll('[data-ldel]').forEach(b=>b.onclick=async()=>{await sb.from('quote_lines').delete().eq('id',b.dataset.ldel);S.qlines=S.qlines.filter(x=>x.id!==b.dataset.ldel);render()});
