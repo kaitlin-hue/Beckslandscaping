@@ -365,21 +365,24 @@ async function start(){
   if(!S.user)return renderLogin();
   const {data}=await sb.from('profiles').select('*').eq('id',S.user.id).maybeSingle();
   S.profile=data||{role:'pending',name:''};
-  if(role()==='pending'){$('#root').innerHTML=`<div class="login"><div class="card"><h2>You're in the queue</h2><p class="small muted">Greg or Kaitlin needs to approve ${esc(S.user.email)} before you can see the hub.</p><button class="btn ghost block" id="lo">Log out</button></div></div>`;$('#lo').onclick=()=>sb.auth.signOut();return}
+  if(role()==='pending'){$('#root').innerHTML=`<div class="login"><div class="card"><h2>No access yet</h2><p class="small muted">${esc(S.user.email)} isn’t set up for the hub. Ask Kaitlin for your login.</p><button class="btn ghost block" id="lo">Log out</button></div></div>`;$('#lo').onclick=()=>sb.auth.signOut();return}
   S.view=isStaff()?'home':isMkt()?'board':'site';
   $('#root').innerHTML='<div class="spinner" style="margin-top:40vh"></div>';
   await loadAll();render();
 }
 function renderLogin(){
   $('#root').innerHTML=`<div class="login"><div class="card">
-    <div class="brand" style="color:var(--green-2)"><b>BECK'S LANDSCAPING</b><span style="color:var(--mut)">HUB</span></div>
+    <div class="brand" style="color:var(--green-2)"><b>BECK’S LANDSCAPING</b><span style="color:var(--mut)">HUB</span></div>
     <p class="small muted" style="margin:12px 0 4px">Jobs, board, numbers.</p>
-    <label>Email</label><input id="em" type="email" autocomplete="email" placeholder="you@email.com">
-    <button class="btn block" style="margin-top:12px" id="go">Email me a login link</button>
-    <p class="small muted" id="msg" style="margin:10px 0 0">No password. Tap the link in your email.</p></div></div>`;
-  $('#go').onclick=async()=>{const email=$('#em').value.trim();if(!email)return;$('#go').disabled=true;
-    const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname}});
-    $('#msg').textContent=error?error.message:'Check your email and tap the link.';$('#go').disabled=false};
+    <form id="lf"><label for="em">Login</label><input id="em" autocomplete="username" autocapitalize="none" placeholder="Your name, or crew" required>
+    <label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" required>
+    <button class="btn block" style="margin-top:12px" id="go" type="submit">Log in</button></form>
+    <p class="small muted" id="msg" style="margin:10px 0 0">Forgotten it? Ask Kaitlin.</p></div></div>`;
+  $('#lf').onsubmit=async e=>{e.preventDefault();let email=$('#em').value.trim().toLowerCase();const password=$('#pw').value;if(!email||!password)return;
+    const AKA={kaitlin:'kaitlin@vitalculture.com.au',lauren:'hattonlauren1995@gmail.com'};if(AKA[email])email=AKA[email];else if(!email.includes('@'))email+='@beckslandscaping.com.au';$('#go').disabled=true;
+    const {error}=await sb.auth.signInWithPassword({email,password});
+    if(error){$('#msg').textContent='That login or password didn’t work. Ask Kaitlin if you’re stuck.';$('#pw').value=''}
+    $('#go').disabled=false};
 }
 
 /* ---------- shell ---------- */
@@ -456,7 +459,7 @@ function viewToday(el){
 
   el.innerHTML=`<div class="today-head"><div><div class="eyebrow">${t0.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'})}</div>
    <h1>${hello}${firstName?', '+esc(firstName):''}</h1></div></div>
-  ${S.dbReady?'':`<div class="need info" style="cursor:default;margin-top:12px"><span class="dot"></span><span class="txt"><b>Database update waiting</b><span>Enquiries, promised start windows and the finance password switch on once it has run.</span></span></div>`}
+  ${S.dbReady?'':`<div class="need info" style="cursor:default;margin-top:12px"><span class="dot"></span><span class="txt"><b>Database update waiting</b><span>Enquiries and promised start windows switch on once it has run.</span></span></div>`}
   <div class="tiles">
    <div class="tile dark"><div class="eyebrow">Job profit</div><div class="v">${withProfit.length?money(profit):'–'}</div>
     <div class="s">${withProfit.length?`${pct(profit/rev)} margin on ${withProfit.length} ${plural(withProfit.length,'job','jobs')}`:'Needs crew cost per day in Rates'}</div>
@@ -482,26 +485,10 @@ function viewToday(el){
   el.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>b.dataset.id?go('job',b.dataset.id):go(b.dataset.go));
 }
 
-/* ---------- money (owner and admin, behind the finance password) ---------- */
+/* ---------- money (Greg and Kaitlin only: their login is the lock) ---------- */
 function viewMoney(el){
-  const head=`<div class="row between" style="margin:18px 0 6px"><h1>Money</h1>${S.finUntil?`<button class="btn light sm" id="lock">Lock</button>`:''}</div>`;
-  if(S.finSet===null){el.innerHTML=head+`<div class="card"><h2>Locked</h2><p class="small muted" style="margin:6px 0 0">The finance password switches on once the database update has run.</p></div>`;return}
-  if(!S.finSet){
-    el.innerHTML=head+`<div class="card" style="max-width:440px"><h2>Set the finance password</h2><p class="small muted" style="margin:6px 0 0">One password for Greg and Kaitlin. Invoices, booked work and quotes out stay behind it.</p>
-     <label for="np">New password</label><input id="np" type="password" autocomplete="new-password">
-     <label for="np2">Type it again</label><input id="np2" type="password" autocomplete="new-password">
-     <button class="btn" id="setp" style="margin-top:12px">Set password</button></div>`;
-    $('#setp').onclick=async()=>{const a=$('#np').value,b=$('#np2').value;if(a.length<6)return toast('Use at least 6 characters');if(a!==b)return toast("They don't match");
-      const {error}=await sb.rpc('set_finance_password',{new_pass:a});if(error)return toast(error.message);S.finSet=true;S.finUntil=Date.now()+15*6e4;toast('Password set');render()};
-    return}
-  if(!S.finUntil){
-    el.innerHTML=head+`<div class="card" style="max-width:440px"><h2>Finance password</h2><p class="small muted" style="margin:6px 0 0">Unlocks for 15 minutes.</p>
-     <label for="fp">Password</label><input id="fp" type="password" autocomplete="current-password">
-     <button class="btn" id="unl" style="margin-top:12px">Unlock</button></div>`;
-    const tryIt=async()=>{const {data,error}=await sb.rpc('check_finance_password',{pass:$('#fp').value});if(error)return toast(error.message);if(!data){$('#fp').value='';return toast('Wrong password')}
-      S.finUntil=Date.now()+15*6e4;render()};
-    $('#unl').onclick=tryIt;$('#fp').onkeydown=e=>{if(e.key==='Enter')tryIt()};$('#fp').focus();return}
-
+  if(!isStaff())return go(isMkt()?'board':'site');
+  const head=`<div class="row between" style="margin:18px 0 6px"><h1>Money</h1></div>`;
   const chase=S.jobs.filter(j=>['Complete','Invoiced'].includes(j.stage)).map(j=>({j,amt:+j.invoiced_total||+j.quote_total||0,since:j.closed_at||null})).sort((a,b)=>String(a.since||'').localeCompare(String(b.since||''))||(a.j.job_no||0)-(b.j.job_no||0));
   const owed=chase.reduce((a,c)=>a+c.amt,0);
   const booked=S.jobs.filter(j=>BOOKED.includes(j.stage)).reduce((a,j)=>a+(+j.quote_total||0),0);
@@ -511,21 +498,13 @@ function viewMoney(el){
     <div class="tile dark"><div class="eyebrow">To invoice or chase</div><div class="v">${money(owed)}</div><div class="s">${chase.length} finished, not paid</div><div class="src">Jobs at Complete or Invoiced · inc GST</div></div>
     <div class="tile"><div class="eyebrow">Booked work</div><div class="v">${money(booked)}</div><div class="s">Accepted, not finished</div><div class="src">Quote totals inc GST</div></div>
     <div class="tile"><div class="eyebrow">Quotes out</div><div class="v">${money(out)}</div><div class="s">Waiting on a yes</div><div class="src">Quote totals inc GST</div></div>
-    <div class="tile"><div class="eyebrow">Unlocked</div><div class="v" style="font-size:22px">${new Date(S.finUntil).toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit'})}</div><div class="s">Locks again at this time</div><div class="src"><a href="#" id="chg" style="color:inherit">Change password</a></div></div>
    </div>
    <div class="card"><div class="row between"><h2>To invoice or chase</h2><span class="small muted">Oldest first</span></div>
     ${imports>chase.length/2?`<p class="small" style="margin:6px 0 0"><span class="pill warn">Check</span> Most of these came across from Xero. Mark the ones already paid so this is right.</p>`:''}
     <div style="overflow-x:auto"><table style="margin-top:8px;min-width:480px"><thead><tr><th>Client</th><th>Suburb</th><th>Stage</th><th class="num">Finished</th><th class="num">Amount</th></tr></thead><tbody>
     ${chase.map(c=>`<tr data-id="${c.j.id}" style="cursor:pointer"><td><b class="small">${esc(c.j.clients?.name||'')}</b></td><td class="small muted">${esc(c.j.suburb||'')}</td><td>${stagePill(c.j.stage)}</td><td class="num small">${c.since?fmtShort(String(c.since).slice(0,10)):'<span class="muted">Xero</span>'}</td><td class="num">${money(c.amt)}</td></tr>`).join('')||'<tr><td colspan="5" class="small muted">Nothing to chase.</td></tr>'}
-    </tbody></table></div></div>
-   <div class="card" id="chgbox" style="max-width:440px;display:none"><h2>Change password</h2>
-    <label for="op">Current password</label><input id="op" type="password" autocomplete="current-password">
-    <label for="np">New password</label><input id="np" type="password" autocomplete="new-password">
-    <button class="btn light sm" id="chgp" style="margin-top:10px">Save</button></div>`;
-  $('#lock').onclick=()=>{S.finUntil=0;render()};
+    </tbody></table></div></div>`;
   el.querySelectorAll('tr[data-id]').forEach(r=>r.onclick=()=>go('job',r.dataset.id));
-  $('#chg').onclick=e=>{e.preventDefault();$('#chgbox').style.display='block'};
-  $('#chgp').onclick=async()=>{const {error}=await sb.rpc('set_finance_password',{new_pass:$('#np').value,old_pass:$('#op').value});toast(error?error.message:'Password changed');if(!error)$('#chgbox').style.display='none'};
 }
 
 function viewJobs(el){
@@ -1124,9 +1103,14 @@ async function viewRates(el){
 /* ---------- me ---------- */
 async function viewMe(el){
   el.innerHTML=`<div class="card" style="margin-top:18px"><h2>${esc(S.profile.name||S.user.email)}</h2><p class="small muted">${esc(S.user.email)} · ${esc(role())}</p>
-   ${isStaff()?`<div class="row wrap" style="gap:6px;margin:8px 0"><button class="btn light sm" data-go="money">Money</button><button class="btn light sm" data-go="mkt">Marketing</button><button class="btn light sm" id="toRates">Rates and crew</button></div>`:''}<button class="btn ghost sm" id="lo">Log out</button></div>
-  ${isStaff()?`<div class="card"><h2>Team</h2><p class="small muted" style="margin:4px 0 8px">New logins wait here. Crew see jobs, the board and toolbox, no money or client contacts. Marketing sees the board, enquiries and campaigns, no money.</p><div id="team"><div class="spinner"></div></div></div>`:''}
+   ${isStaff()?`<div class="row wrap" style="gap:6px;margin:8px 0"><button class="btn light sm" data-go="money">Money</button><button class="btn light sm" data-go="mkt">Marketing</button><button class="btn light sm" id="toRates">Rates and crew</button></div>`:''}<button class="btn ghost sm" id="lo">Log out</button>
+   <details style="margin-top:12px"><summary class="small" style="cursor:pointer">Change my password</summary>
+    <label for="mp1">New password</label><input id="mp1" type="password" autocomplete="new-password">
+    <label for="mp2">Type it again</label><input id="mp2" type="password" autocomplete="new-password">
+    <button class="btn light sm" id="mpgo" style="margin-top:10px">Save</button></details></div>
+  ${isStaff()?`<div class="card"><h2>Team</h2><p class="small muted" style="margin:4px 0 8px">Who can see what. Crew see jobs, the board and toolbox, no money or client contacts. Marketing sees the board, enquiries and campaigns, no money.</p><div id="team"><div class="spinner"></div></div></div>`:''}
   <div class="card small muted">Add to home screen: tap Share, then Add to Home Screen.</div>`;
+  $('#mpgo').onclick=async()=>{const a=$('#mp1').value,b=$('#mp2').value;if(a.length<8)return toast('Use at least 8 characters');if(a!==b)return toast('They don’t match');const {error}=await sb.auth.updateUser({password:a});toast(error?error.message:'Password changed');if(!error){$('#mp1').value='';$('#mp2').value=''}};
   $('#lo').onclick=()=>sb.auth.signOut();$('#toRates')&&($('#toRates').onclick=()=>go('rates'));el.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
   if(!isStaff())return;
   const {data:people}=await sb.from('profiles').select('*').order('created_at');
