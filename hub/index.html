@@ -242,7 +242,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const money=(n,dp=0)=>n==null||isNaN(n)?'–':(n<0?'-':'')+'$'+Math.abs(+n).toLocaleString('en-AU',{minimumFractionDigits:dp,maximumFractionDigits:dp});
 const r1=n=>Math.round((+n||0)*10)/10;
 const pct=n=>isFinite(n)?Math.round(n*100)+'%':'–';
-function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2600)}
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),Math.max(2600,m.length*55))}
 const role=()=>S.profile?.role;
 const isStaff=()=>['owner','admin'].includes(role());
 const isMkt=()=>role()==='marketing';
@@ -704,10 +704,14 @@ function tellCard(){return `<div class="card" id="tell"><div class="row between"
    <textarea id="tellt" style="min-height:56px;margin-top:8px" placeholder="New client Jenny Smith in Floreat, 0412 000 000, wants paving. Call her Thursday. Pearse job starts Monday with two crew."></textarea>
    <div class="row between" style="margin-top:8px"><span class="tiny muted">Adds clients, notes, follow ups, start dates, stage changes and things to watch. New jobs go through New quote.</span><button class="btn sm" id="tellgo">Work it out</button></div>
    <div id="tellout"></div></div>`}
+async function fnErr(data,error){let msg=data?.error;if(error&&!msg){try{msg=(await error.context.json()).error}catch{msg=error.message}}
+  if(msg&&/credit balance/i.test(msg))msg='The hub\u2019s Claude account is out of credit. Top it up at console.anthropic.com (Plans and Billing) and this works again.';
+  if(msg&&/api key/i.test(msg)&&/not set/i.test(msg))msg='The Claude API key is missing in Supabase secrets.';
+  return msg||null}
 function bindTell(el){const go1=$('#tellgo');if(!go1)return;
   go1.onclick=async()=>{const t=$('#tellt').value.trim();if(!t)return toast('Say or type something first');go1.disabled=true;go1.textContent='Reading…';
     const {data,error}=await sb.functions.invoke('parse-command',{body:{transcript:t}});go1.disabled=false;go1.textContent='Work it out';
-    if(error||data?.error){return toast(data?.error||error.message)}
+    const emsg=await fnErr(data,error);if(emsg)return toast(emsg);
     const r=data.result||{actions:[],questions:[]};S.tell=r;
     $('#tellout').innerHTML=`<div style="margin-top:10px">${r.actions.length?r.actions.map((a,i)=>`<label class="row" style="gap:10px;padding:8px 0;border-bottom:1px solid var(--line);align-items:flex-start"><input type="checkbox" data-ai="${i}" checked style="width:auto;margin-top:3px"><span class="small">${esc(a.summary)}</span></label>`).join(''):'<p class="small muted">Nothing to apply.</p>'}
      ${(r.questions||[]).length?`<div class="small" style="margin-top:8px"><b>To clear up</b>${r.questions.map(q=>`<div class="muted">${esc(q)}</div>`).join('')}</div>`:''}
@@ -795,7 +799,7 @@ async function viewActivity(el){
   $('#aw').onchange=draw;$('#at').onchange=draw;draw()}
 
 /* ---------- elevated layer ---------- */
-const HERO_IMG={home:'/img/nedlands/built-pool.webp',jobs:'/img/nedlands/built-lawn.webp',clients:'/img/nedlands/built-seat.webp',board:'/img/nedlands/built-view.webp',nums:'/img/nedlands/built-pool.webp',brain:'/img/nedlands/built-wall.webp',mkt:'/img/nedlands/built-firepit.webp',activity:'/img/nedlands/during-turf.webp',money:'/img/nedlands/built-pool.webp',tool:'/img/nedlands/during-dig.webp',site:'/img/nedlands/built-lawn.webp'};
+const HERO_IMG={home:'/img/hero-pool.jpg',jobs:'/img/nedlands/built-lawn.webp',clients:'/img/nedlands/built-seat.webp',board:'/img/nedlands/built-view.webp',nums:'/img/nedlands/built-pool.webp',brain:'/img/nedlands/built-wall.webp',mkt:'/img/nedlands/built-firepit.webp',activity:'/img/nedlands/during-turf.webp',money:'/img/nedlands/built-pool.webp',tool:'/img/nedlands/during-dig.webp',site:'/img/nedlands/built-lawn.webp'};
 const HERO_EYE={jobs:'Every job',clients:'The people',board:'Who is where',nums:'Know the numbers',brain:'Keep an eye on',mkt:'Fill the board',activity:'Who did what',money:'Money',tool:'Monday toolbox',site:'This week'};
 function lsGet(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
@@ -1060,7 +1064,7 @@ function viewDay(el){
     $('#read').disabled=true;$('#read').textContent='Reading it…';
     const {data,error}=await sb.functions.invoke('parse-day',{body:{transcript:d.transcript,date:d.date}});
     $('#read').disabled=false;$('#read').textContent='Sort it out';
-    let msg=data?.error;if(error&&!msg){try{msg=(await error.context.json()).error}catch{msg=error.message}}
+    let msg=await fnErr(data,error);
     if(msg||!data?.day)return toast(msg||'Could not read that. Try again.');
     const day=data.day;day.date=day.date||d.date;day.entries=(day.entries||[]).map(e=>({...e,job_id:S.jobs.some(j=>j.id===e.job_id)?e.job_id:''}));
     day.issues=(day.issues||[]).map(i=>({...i,job_id:S.jobs.some(j=>j.id===i.job_id)?i.job_id:''}));
@@ -1232,7 +1236,7 @@ function viewAdd(el){
     $('#build').disabled=true;$('#build').textContent='Reading it…';
     const {data,error}=await sb.functions.invoke('parse-job',{body:{transcript:S.draft.transcript,images:S.draft.images}});
     $('#build').disabled=false;$('#build').textContent='Build the job';
-    let msg=data?.error;if(error&&!msg){try{msg=(await error.context.json()).error}catch{msg=error.message}}
+    let msg=await fnErr(data,error);
     if(msg||!data?.job)return toast(msg||'Could not read that. Try again.');
     S.draft.job=data.job;go('review')};
 }
@@ -1733,7 +1737,7 @@ async function viewMe(el){
   el.querySelectorAll('[data-rp]').forEach(b=>b.onclick=()=>{$('#rpb-'+b.dataset.rp).classList.toggle('hidden');$('#rpi-'+b.dataset.rp).focus()});
   el.querySelectorAll('[data-rps]').forEach(b=>b.onclick=async()=>{const id=b.dataset.rps,pw=$('#rpi-'+id).value;if(pw.length<8)return toast('Use at least 8 characters');b.disabled=true;
     const {data,error}=await sb.functions.invoke('admin-set-password',{body:{user_id:id,password:pw}});b.disabled=false;
-    if(error||data?.error)return toast(data?.error||error.message);$('#rpi-'+id).value='';$('#rpb-'+id).classList.add('hidden');toast(`New password set for ${data.name}. Text it to them.`);await loadAll()});
+    const emsg=await fnErr(data,error);if(emsg)return toast(emsg);$('#rpi-'+id).value='';$('#rpb-'+id).classList.add('hidden');toast(`New password set for ${data.name}. Text it to them.`);await loadAll()});
   el.querySelectorAll('[data-pid]').forEach(s=>s.onchange=async()=>{const {error}=await sb.from('profiles').update({role:s.value}).eq('id',s.dataset.pid);toast(error?error.message:'Updated')});
 }
 
