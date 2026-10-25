@@ -545,7 +545,6 @@ function viewToday(el){
   <div class="today-grid">
    <div class="card"><div class="row between"><h2>Needs you</h2><span class="small muted">${needs.length}</span></div>
     ${needs.length?needs.map(([k,t,s,v,b,id])=>`<button class="need ${k==='warn'?'':k}" data-go="${v}"${id?` data-id="${id}"`:''}><span class="dot"></span><span class="txt"><b>${t}</b><span>${s}</span></span><span class="go">${b}</span></button>`).join(''):'<p class="small muted" style="margin:10px 0 0">Nothing needs you today.</p>'}</div>
-   ${toCheckCard()}
    ${watchCard()}
    <div class="card"><div class="row between"><h2>Promised start dates</h2><span class="small muted">${promised.length}</span></div>
     ${promised.length?promised.map(({j,p})=>`<button class="need ${pState[p.state][0]==='bad'?'bad':pState[p.state][0]==='warn'?'':'info'}" data-go="job" data-id="${j.id}"><span class="dot"></span><span class="txt"><b>${esc(nameOf(j))} · ${p.label}</b><span>${fmtShort(iso(p.from))} to ${fmtShort(iso(p.to))}. ${j.start_date?'Starts '+fmtD(j.start_date):'Not on the board'}</span></span><span class="pill ${pState[p.state][0]}">${pState[p.state][1]}</span></button>`).join(''):`<p class="small muted" style="margin:10px 0 0">When Greg tells a client "8 to 10 weeks", add it on the job. It shows here and on the board.</p>`}</div>
