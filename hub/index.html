@@ -428,7 +428,7 @@ const IC={clients:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" s
 function go(v,id){S.view=v;if(id!==undefined)S.jobId=id;render();scrollTo(0,0)}
 function render(){
   // phone bar keeps five or six; items marked desk only show in the desktop sidebar (and on the Me page)
-  const tabs=isStaff()?[['home','Today',IC.home],['jobs','Jobs',IC.jobs],['clients','Clients',IC.clients,'desk'],['board','Board',IC.board],['add','Log the day',IC.add],['tool','Toolbox',IC.tool],['nums','Numbers',IC.nums],['brain','Brain',IC.tool,'desk'],['money','Money',IC.lock,'desk'],['mkt','Marketing',IC.mkt,'desk']]
+  const tabs=isStaff()?[['home','Today',IC.home],['jobs','Jobs',IC.jobs],['clients','Clients',IC.clients,'desk'],['board','Board',IC.board],['add','Log the day',IC.add],['tool','Toolbox',IC.tool],['nums','Numbers',IC.nums],['brain','Brain',IC.tool,'desk'],['activity','Activity',IC.nums,'desk'],['money','Money',IC.lock,'desk'],['mkt','Marketing',IC.mkt,'desk']]
     :isMkt()?[['board','Board',IC.board],['mkt','Marketing',IC.mkt]]:[['site','Jobs',IC.jobs],['board','Board',IC.board],['tool','Toolbox',IC.tool]];
   const allowed=new Set(tabs.map(t=>t[0]).concat(isStaff()?['job','review','dayrev','rates','me','cjob','quote','client','nq']:isMkt()?['me']:['me','cjob']));
   if(S.finUntil&&Date.now()>S.finUntil)S.finUntil=0;
@@ -438,7 +438,7 @@ function render(){
   <nav class="tabs" aria-label="Main"><div class="brandwrap nav-brandwrap"><img src="${LOGO}" alt=""><div class="brand nav-brand"><b>BECK'S</b><span>LANDSCAPING HUB</span></div></div>${tabs.map(([k,l,ic,d])=>`<button data-v="${k}" class="${k==='add'?'add':''} ${d||''} ${cur===k?'on':''}" aria-label="${l}">${ic}<span>${l}</span></button>`).join('')}<button class="nav-foot" id="me2">${esc(S.profile.name||'Me')} · ${esc(role())}</button></nav>`;
   document.querySelectorAll('nav.tabs button[data-v]').forEach(b=>b.onclick=()=>go(b.dataset.v));
   $('#me').onclick=()=>go('me');$('#me2').onclick=()=>go('me');
-  ({home:viewToday,money:viewMoney,jobs:viewJobs,board:viewBoard,add:viewAdd,review:viewReview,dayrev:viewDayReview,tool:viewToolbox,site:viewSite,cjob:viewCrewJob,job:viewJob,nums:viewNumbers,mkt:viewMarketing,rates:viewRates,me:viewMe,quote:viewQuote,clients:viewClients,client:viewClient,nq:viewNewQuote,brain:viewBrain})[v]($('#main'));
+  ({home:viewToday,money:viewMoney,jobs:viewJobs,board:viewBoard,add:viewAdd,review:viewReview,dayrev:viewDayReview,tool:viewToolbox,site:viewSite,cjob:viewCrewJob,job:viewJob,nums:viewNumbers,mkt:viewMarketing,rates:viewRates,me:viewMe,quote:viewQuote,clients:viewClients,client:viewClient,nq:viewNewQuote,brain:viewBrain,activity:viewActivity})[v]($('#main'));
 }
 function stageBar(stage){const i=STAGES.indexOf(stage);return `<div class="stagebar">${STAGES.map((_,k)=>`<i class="${k<=i?'on':''}"></i>`).join('')}</div>`}
 function stagePill(s){const c=s==='Lost'?'bad':PENCIL.includes(s)?'warn':['Paid'].includes(s)?'grey':['Complete','Invoiced'].includes(s)?'good':'';return `<span class="pill ${c}">${esc(s)}</span>`}
@@ -605,7 +605,7 @@ function viewClients(el){
 }
 function enquiryCard(j){const e=j.enquiry;if(!e)return '';const types=Array.isArray(e.project_types)?e.project_types.join(', '):'';
   const row=(k,v)=>v?`<div class="row between small" style="padding:4px 0;border-bottom:1px solid var(--line)"><span class="muted">${k}</span><span style="text-align:right">${esc(v)}</span></div>`:'';
-  return `<div class="card"><div class="row between"><h2>Enquiry</h2><span class="tiny muted">${e.from==='website'?'Website form':esc(e.from||'')}${e.submitted_at?' · '+fmtShort(String(e.submitted_at).slice(0,10)):''}</span></div>
+  return `<div class="card"><div class="row between"><h2>Enquiry</h2><span class="tiny muted">${e.from==='website'?'Website form':esc(e.from||'')}${e.submitted_at?' · '+whenStr(e.submitted_at):''}</span></div>
    ${row('Wants',types)}${row('Budget',e.budget)}${row('Start',e.start_pref)}${row('Contact by',e.contact_pref)}${row('Enquiring as',e.enquiring_as)}${row('Heard of us',e.source||j.lead_source)}
    ${j.notes?`<p class="small" style="margin:8px 0 0;white-space:pre-wrap">${esc(j.notes)}</p>`:''}</div>`}
 function viewClient(el){
@@ -731,6 +731,36 @@ function viewBrain(el){
     const {data,error}=await sb.from('brain').insert({kind:$('#bk').value,note,supplier_id:$('#bs').value||null,watch:$('#bw').checked,by:S.profile.id,by_name:S.profile.name||null}).select().single();if(error)return toast(error.message);S.brain.unshift(data);toast('In the brain');render()};
   el.querySelectorAll('[data-res]').forEach(b=>b.onclick=async()=>{const {error}=await sb.from('brain').update({resolved_at:new Date().toISOString()}).eq('id',b.dataset.res);if(error)return toast(error.message);const x=S.brain.find(y=>y.id===b.dataset.res);if(x)x.resolved_at=new Date().toISOString();render()});
 }
+
+/* ---------- History: who changed what, when (from the activity_log trigger) ---------- */
+const FIELD={stage:'Stage',quote_total:'Quote',quote_ex_gst:'Quote ex GST',quoted_labour:'Labour in quote',start_date:'Start',end_date:'Finish',crew_size:'Crew',suburb:'Suburb',address:'Address',title:'Job',name:'Name',phone:'Phone',email:'Email',notes:'Notes',note:'Note',site_notes:'Site notes',follow_up_on:'Follow up',done_at:'Done',kind:'Type',hours:'Hours',work_date:'Day',status:'Status',lost_reason:'Lost because',deposit_pct:'Deposit %',promised_on:'Promised on',contacted_at:'Contacted',quote_sent_at:'Quote sent',quote_accepted_at:'Quote accepted',quote_accepted_name:'Accepted by',deposit_invoice_no:'Deposit invoice',final_invoice_no:'Final invoice',paid_at:'Paid',item:'Item',qty:'Qty',unit_cost:'Cost',markup_pct:'Markup',copy:'Copy',week_start:'Week',resolved_at:'Sorted',source:'Found us via',lead_source:'Source'};
+const TBL={jobs:'Job',clients:'Client',client_notes:'Note',crew_days:'Crew day',quote_lines:'Quote line',campaigns:'Campaign',brain:'Brain',purchase_orders:'Order',issues:'Problem',settings:'Settings',job_plan_days:'Day plan'};
+function whenStr(ts){const d=new Date(ts);return d.toLocaleDateString('en-AU',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit'}).replace(' ','').toLowerCase()}
+function fmtVal(k,v){if(v===''||v==null)return '–';if(/_at$|_on$|date$|^week_start$/.test(k)&&/^\d{4}-\d\d-\d\d/.test(v))return fmtShort(v.slice(0,10));if(['quote_total','quote_ex_gst','quoted_labour','unit_cost'].includes(k)&&!isNaN(+v))return money(+v);return v.length>60?v.slice(0,60)+'…':v}
+function histLine(a){const ch=a.changed||{},keys=Object.keys(ch).filter(k=>FIELD[k]||a.action!=='insert').slice(0,4);
+  const what=a.action==='insert'?`Added ${(TBL[a.table_name]||a.table_name).toLowerCase()}${a.label?': '+esc(a.label.slice(0,60)):''}`:a.action==='delete'?`Removed ${(TBL[a.table_name]||a.table_name).toLowerCase()}${a.label?': '+esc(a.label.slice(0,60)):''}`:
+    keys.map(k=>`${FIELD[k]||k} ${esc(fmtVal(k,ch[k][0]))} → <b>${esc(fmtVal(k,ch[k][1]))}</b>`).join(' · ')+(Object.keys(ch).length>4?` · and ${Object.keys(ch).length-4} more`:'');
+  return `<div style="padding:7px 0;border-bottom:1px solid var(--line)"><div class="small">${what||'Updated'}</div><div class="tiny muted">${whenStr(a.at)} · ${esc(a.by_name||'Someone')}${a.action==='update'?' · '+(TBL[a.table_name]||a.table_name):''}</div></div>`}
+async function loadHistory(box,{job_id,client_id,job_ids}){if(!box)return;
+  let q=sb.from('activity_log').select('*').order('at',{ascending:false}).limit(60);
+  if(job_id)q=q.eq('job_id',job_id);else{const ors=[`client_id.eq.${client_id}`];if(job_ids&&job_ids.length)ors.push(`job_id.in.(${job_ids.join(',')})`);q=q.or(ors.join(','))}
+  const {data,error}=await q;
+  if(error){box.innerHTML='<p class="small muted" style="margin:6px 0 0">History switches on once the database update has run.</p>';return}
+  box.innerHTML=data.length?data.map(histLine).join(''):'<p class="small muted" style="margin:6px 0 0">Nothing changed since history started.</p>'}
+async function viewActivity(el){
+  el.innerHTML=`<div class="row between" style="margin:18px 0 6px"><h1>Activity</h1><span class="small muted">Last 14 days</span></div>
+  <p class="small muted" style="margin:0 0 6px">Every change and every form that came in: who did it and when.</p>
+  <div class="row" style="gap:8px;flex-wrap:wrap"><select id="aw" style="width:auto"><option value="">Everyone</option></select><select id="at" style="width:auto"><option value="">Everything</option>${Object.entries(TBL).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></div>
+  <div class="card" id="al"><div class="spinner"></div></div>`;
+  const {data,error}=await sb.from('activity_log').select('*').gte('at',new Date(Date.now()-14*864e5).toISOString()).order('at',{ascending:false}).limit(500);
+  if(error){$('#al').innerHTML='<p class="small muted">Activity switches on once the database update has run.</p>';return}
+  const who=[...new Set(data.map(a=>a.by_name||'Someone'))].sort();$('#aw').innerHTML+=who.map(w=>`<option>${esc(w)}</option>`).join('');
+  const draw=()=>{const w=$('#aw').value,t=$('#at').value;const list=data.filter(a=>(!w||(a.by_name||'Someone')===w)&&(!t||a.table_name===t));
+    $('#al').innerHTML=list.length?list.map(a=>{const j=a.job_id?S.jobs.find(x=>x.id===a.job_id):null,c=a.client_id?S.clients.find(x=>x.id===a.client_id):null;
+      const tag=j?`<button class="btn light sm" data-j="${j.id}" style="padding:3px 9px;font-size:11px">${esc(nameOf(j))}</button>`:c?`<button class="btn light sm" data-c="${c.id}" style="padding:3px 9px;font-size:11px">${esc(c.name)}</button>`:'';
+      return `<div class="row between" style="gap:8px;align-items:flex-start">${histLine(a).replace('<div style="padding:7px 0;','<div style="flex:1;padding:7px 0;')}${tag?`<div style="padding-top:8px">${tag}</div>`:''}</div>`}).join(''):'<p class="small muted">Nothing matches.</p>';
+    $('#al').querySelectorAll('[data-j]').forEach(b=>b.onclick=()=>go('job',b.dataset.j));$('#al').querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>go('client',b.dataset.c))};
+  $('#aw').onchange=draw;$('#at').onchange=draw;draw()}
 
 function viewBoard(el){
   const t0=today0(),cut=iso(new Date(t0.getTime()-14*864e5));
