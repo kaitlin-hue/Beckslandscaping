@@ -18,7 +18,8 @@
   --good:#3f7a4f;--warn:#b7791f;--bad:#b4432f;--r:14px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.45 Montserrat,-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+html,body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI","Helvetica Neue",Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+h1,h2,.brand b,.ph-title{font-family:Montserrat,-apple-system,BlinkMacSystemFont,sans-serif}
 h1,h2,h3{margin:0;letter-spacing:-.02em}
 h1{font-size:24px;font-weight:700;letter-spacing:-.03em}h2{font-size:17px;font-weight:700;letter-spacing:-.01em}h3{font-size:15px;font-weight:600}
 .serif{font-family:Georgia,"Times New Roman",serif;font-weight:400}
@@ -192,6 +193,35 @@ nav.tabs .nav-brand,nav.tabs .nav-foot,nav.tabs button.desk{display:none}
   nav.tabs .nav-foot{display:flex;order:99;min-height:40px;font-size:13px;font-weight:500;color:var(--mut);margin-top:8px}
   .toast{bottom:32px;left:calc(50% + 124px)}
 }
+
+/* ---------- elevated layer: photo heroes, folding cards, gestures ---------- */
+nav.tabs .nav-brand .b2{letter-spacing:.01em;font-size:15px;color:var(--charcoal);margin-top:2px}nav.tabs .nav-brand .b2+span{margin-top:4px}
+.brand b{font-weight:800;letter-spacing:.02em}.brand .b2{font-weight:500;letter-spacing:.01em;font-size:13px;color:var(--charcoal);margin-top:1px;text-transform:none}
+.ph{position:relative;margin:14px 0 6px;border-radius:20px;overflow:hidden;min-height:190px;background:#2b2f2a center/cover no-repeat;color:#fff;display:flex;flex-direction:column;justify-content:flex-end;padding:22px 20px 18px;isolation:isolate;transition:min-height .35s ease,padding .35s ease}
+.ph::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(21,20,15,.05) 0%,rgba(21,20,15,.15) 40%,rgba(21,20,15,.72) 100%);z-index:-1}
+.ph .ph-eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:rgba(255,255,255,.88);position:absolute;top:18px;left:20px}
+.ph h1{color:#fff;font-size:clamp(28px,5vw,40px);font-weight:800;letter-spacing:-.035em;line-height:1.02;margin:0}
+.ph .row.between{margin:0!important;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.ph .muted,.ph .small{color:rgba(255,255,255,.85)!important}
+.ph .eyebrow{color:rgba(255,255,255,.88)!important}
+.ph .btn{background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.45);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.ph .btn:not(.light){background:var(--green);border-color:var(--green)}
+.ph.slim{min-height:84px;padding:16px 20px}.ph.slim .ph-eyebrow{display:none}.ph.slim h1{font-size:22px}
+.ph .ph-grip{position:absolute;top:10px;left:50%;width:36px;height:4px;margin-left:-18px;border-radius:4px;background:rgba(255,255,255,.55)}
+@media(min-width:1000px){.ph{min-height:230px;padding:28px 30px 24px}.ph .ph-eyebrow{left:30px;top:24px}.ph .ph-grip{display:none}}
+.card.foldable>.fold-head{cursor:pointer;user-select:none;gap:10px}.card.foldable>.fold-head>:first-child{margin-right:auto}
+.card.foldable>.fold-head::after{content:"";width:9px;height:9px;border-right:2px solid var(--mut);border-bottom:2px solid var(--mut);transform:rotate(45deg);margin:0 4px 4px 10px;transition:transform .25s ease;flex:none}
+.card.foldable.folded>.fold-head::after{transform:rotate(-45deg);margin-bottom:0}
+.card.foldable>.fold-body{overflow:hidden;transition:max-height .3s ease,opacity .25s ease}
+.card.foldable.folded>.fold-body{max-height:0!important;opacity:0}
+.card.foldable.folded{padding-bottom:16px}
+#main{will-change:transform}
+#main.in-r{animation:inR .28s cubic-bezier(.2,.8,.2,1)}#main.in-l{animation:inL .28s cubic-bezier(.2,.8,.2,1)}#main.in-up{animation:inUp .3s cubic-bezier(.2,.8,.2,1)}
+@keyframes inR{from{transform:translateX(38px);opacity:.2}to{transform:none;opacity:1}}
+@keyframes inL{from{transform:translateX(-38px);opacity:.2}to{transform:none;opacity:1}}
+@keyframes inUp{from{transform:translateY(26px);opacity:.2}to{transform:none;opacity:1}}
+.swipe-hint{position:fixed;top:50%;z-index:20;width:44px;height:44px;margin-top:-22px;border-radius:50%;background:var(--green-2);color:#fff;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .15s}
+@media(prefers-reduced-motion:reduce){#main.in-r,#main.in-l,#main.in-up{animation:none}.ph,.card.foldable>.fold-body{transition:none}}
 </style>
 </head>
 <body>
@@ -434,11 +464,13 @@ function render(){
   if(S.finUntil&&Date.now()>S.finUntil)S.finUntil=0;
   const v=allowed.has(S.view)?S.view:tabs[0][0];
   const cur=v==='job'||v==='review'||v==='quote'?'jobs':v==='client'?'clients':v==='nq'?'add':v==='dayrev'?'add':v==='cjob'?(isStaff()?'jobs':'site'):v;
-  $('#root').innerHTML=`<div class="app"><header class="top"><div class="brandwrap"><img src="${LOGO}" alt=""><div class="brand"><b>BECK'S</b><span>LANDSCAPING HUB</span></div></div><button class="who" id="me">${esc(S.profile.name||'Me')}</button></header><main id="main"></main></div>
-  <nav class="tabs" aria-label="Main"><div class="brandwrap nav-brandwrap"><img src="${LOGO}" alt=""><div class="brand nav-brand"><b>BECK'S</b><span>LANDSCAPING HUB</span></div></div>${tabs.map(([k,l,ic,d])=>`<button data-v="${k}" class="${k==='add'?'add':''} ${d||''} ${cur===k?'on':''}" aria-label="${l}">${ic}<span>${l}</span></button>`).join('')}<button class="nav-foot" id="me2">${esc(S.profile.name||'Me')} · ${esc(role())}</button></nav>`;
+  $('#root').innerHTML=`<div class="app"><header class="top"><div class="brandwrap"><img src="${LOGO}" alt=""><div class="brand"><b>BECK'S</b><span class="b2">LANDSCAPING</span><span>HUB</span></div></div><button class="who" id="me">${esc(S.profile.name||'Me')}</button></header><main id="main"></main></div>
+  <nav class="tabs" aria-label="Main"><div class="brandwrap nav-brandwrap"><img src="${LOGO}" alt=""><div class="brand nav-brand"><b>BECK'S</b><span class="b2">LANDSCAPING</span><span>HUB</span></div></div>${tabs.map(([k,l,ic,d])=>`<button data-v="${k}" class="${k==='add'?'add':''} ${d||''} ${cur===k?'on':''}" aria-label="${l}">${ic}<span>${l}</span></button>`).join('')}<button class="nav-foot" id="me2">${esc(S.profile.name||'Me')} · ${esc(role())}</button></nav>`;
   document.querySelectorAll('nav.tabs button[data-v]').forEach(b=>b.onclick=()=>go(b.dataset.v));
   $('#me').onclick=()=>go('me');$('#me2').onclick=()=>go('me');
+  const prevV=S.lastView;S.lastView=v;
   ({home:viewToday,money:viewMoney,jobs:viewJobs,board:viewBoard,add:viewAdd,review:viewReview,dayrev:viewDayReview,tool:viewToolbox,site:viewSite,cjob:viewCrewJob,job:viewJob,nums:viewNumbers,mkt:viewMarketing,rates:viewRates,me:viewMe,quote:viewQuote,clients:viewClients,client:viewClient,nq:viewNewQuote,brain:viewBrain,activity:viewActivity})[v]($('#main'));
+  elevate(v,prevV,tabs.map(t=>t[0]));
 }
 function stageBar(stage){const i=STAGES.indexOf(stage);return `<div class="stagebar">${STAGES.map((_,k)=>`<i class="${k<=i?'on':''}"></i>`).join('')}</div>`}
 function stagePill(s){const c=s==='Lost'?'bad':PENCIL.includes(s)?'warn':['Paid'].includes(s)?'grey':['Complete','Invoiced'].includes(s)?'good':'';return `<span class="pill ${c}">${esc(s)}</span>`}
@@ -761,6 +793,51 @@ async function viewActivity(el){
       return `<div class="row between" style="gap:8px;align-items:flex-start">${histLine(a).replace('<div style="padding:7px 0;','<div style="flex:1;padding:7px 0;')}${tag?`<div style="padding-top:8px">${tag}</div>`:''}</div>`}).join(''):'<p class="small muted">Nothing matches.</p>';
     $('#al').querySelectorAll('[data-j]').forEach(b=>b.onclick=()=>go('job',b.dataset.j));$('#al').querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>go('client',b.dataset.c))};
   $('#aw').onchange=draw;$('#at').onchange=draw;draw()}
+
+/* ---------- elevated layer ---------- */
+const HERO_IMG={home:'/img/nedlands/built-pool.webp',jobs:'/img/nedlands/built-lawn.webp',clients:'/img/nedlands/built-seat.webp',board:'/img/nedlands/built-view.webp',nums:'/img/nedlands/built-pool.webp',brain:'/img/nedlands/built-wall.webp',mkt:'/img/nedlands/built-firepit.webp',activity:'/img/nedlands/during-turf.webp',money:'/img/nedlands/built-pool.webp',tool:'/img/nedlands/during-dig.webp',site:'/img/nedlands/built-lawn.webp'};
+const HERO_EYE={jobs:'Every job',clients:'The people',board:'Who is where',nums:'Know the numbers',brain:'Keep an eye on',mkt:'Fill the board',activity:'Who did what',money:'Money',tool:'Monday toolbox',site:'This week'};
+function lsGet(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function elevate(v,prevV,tabKeys){
+  const m=$('#main');if(!m)return;
+  // page motion
+  m.classList.remove('in-r','in-l','in-up');void m.offsetWidth;
+  const i=tabKeys.indexOf(v),j=tabKeys.indexOf(prevV);
+  if(prevV&&prevV!==v)m.classList.add(i>=0&&j>=0?(i>j?'in-r':'in-l'):(i<0?'in-r':'in-up'));
+  // photo hero on the main pages
+  if(HERO_IMG[v]){const head=m.querySelector('.today-head')||[...m.children].find(c=>c.querySelector&&c.querySelector(':scope > h1, :scope > div > h1'));
+    if(head&&!head.closest('.ph')){const ph=document.createElement('section');ph.className='ph'+(lsGet('hero-slim',false)?' slim':'');ph.style.backgroundImage=`url('${HERO_IMG[v]}')`;
+      ph.innerHTML=`<span class="ph-grip" aria-hidden="true"></span>${HERO_EYE[v]?`<span class="ph-eyebrow">${HERO_EYE[v]}</span>`:''}`;
+      head.parentNode.insertBefore(ph,head);ph.appendChild(head);head.style.margin='0';
+      let y0=null;ph.addEventListener('touchstart',e=>{y0=e.touches[0].clientY},{passive:true});
+      ph.addEventListener('touchend',e=>{if(y0==null)return;const dy=e.changedTouches[0].clientY-y0;y0=null;if(Math.abs(dy)<40)return;const slim=dy<0;ph.classList.toggle('slim',slim);lsSet('hero-slim',slim)},{passive:true})}}
+  // folding cards
+  const folded=lsGet('folds',{});
+  m.querySelectorAll(':scope > .card, :scope .today-grid > .card, :scope > div > .card').forEach(card=>{
+    if(card.classList.contains('foldable'))return;const first=card.firstElementChild;if(!first)return;
+    const h2=first.tagName==='H2'?first:(first.classList.contains('row')&&first.querySelector(':scope > h2'));if(!h2)return;
+    if(first.querySelector('input,select,textarea'))return;
+    const key=v+':'+h2.textContent.trim().slice(0,40);
+    const body=document.createElement('div');body.className='fold-body';while(first.nextSibling)body.appendChild(first.nextSibling);
+    if(!body.childNodes.length)return;card.appendChild(body);
+    let head=first;if(first.tagName==='H2'){head=document.createElement('div');head.className='row between';card.insertBefore(head,first);head.appendChild(first)}
+    head.classList.add('fold-head');head.style.display='flex';head.style.alignItems='center';card.classList.add('foldable');if(folded[key])card.classList.add('folded');
+    head.addEventListener('click',e=>{if(e.target.closest('button,a,select,input,label'))return;card.classList.toggle('folded');const f=lsGet('folds',{});f[key]=card.classList.contains('folded');lsSet('folds',f)});
+    let y0=null;head.addEventListener('touchstart',e=>{y0=e.touches[0].clientY},{passive:true});
+    head.addEventListener('touchend',e=>{if(y0==null)return;const dy=e.changedTouches[0].clientY-y0;y0=null;if(Math.abs(dy)>36){const shut=dy<0;card.classList.toggle('folded',shut);const f=lsGet('folds',{});f[key]=shut;lsSet('folds',f)}},{passive:true})});
+}
+// swipe left/right between the main tabs; swipe right to go back from a job, client or quote
+(function(){let x0=null,y0=null,t0=0,ok=false;
+  const noSwipe=el=>el.closest('input,textarea,select,.gantt,.g-scroll,[data-noswipe],table,.weeks,.ph,.fold-head')||[...document.querySelectorAll('#main *')].some(n=>false);
+  const scrollsX=el=>{for(let n=el;n&&n.id!=='main';n=n.parentElement){if(n.scrollWidth>n.clientWidth+4&&getComputedStyle(n).overflowX!=='visible')return true}return false};
+  document.addEventListener('touchstart',e=>{const t=e.target;if(!t.closest||!t.closest('#main')||noSwipe(t)||scrollsX(t)){ok=false;return}ok=true;x0=e.touches[0].clientX;y0=e.touches[0].clientY;t0=Date.now()},{passive:true});
+  document.addEventListener('touchend',e=>{if(!ok||x0==null)return;ok=false;const dx=e.changedTouches[0].clientX-x0,dy=e.changedTouches[0].clientY-y0,dt=Date.now()-t0;x0=null;
+    if(Math.abs(dx)<70||Math.abs(dy)>Math.abs(dx)*.6||dt>700||window.innerWidth>=1000)return;
+    const v=S.lastView,tabs=[...document.querySelectorAll('nav.tabs button[data-v]')].filter(b=>getComputedStyle(b).display!=='none').map(b=>b.dataset.v).filter(k=>k!=='add');
+    const back={job:'jobs',quote:'job',review:'add',client:'clients',dayrev:'add',cjob:isStaff()?'jobs':'site',nq:'home'};
+    if(back[v]){if(dx>0){const to=back[v];to==='job'&&S.jobId?go('job',S.jobId):go(to)}return}
+    const i=tabs.indexOf(v);if(i<0)return;const n=dx<0?tabs[i+1]:tabs[i-1];if(n)go(n)},{passive:true})})();
 
 function viewBoard(el){
   const t0=today0(),cut=iso(new Date(t0.getTime()-14*864e5));
