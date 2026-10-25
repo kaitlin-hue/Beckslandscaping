@@ -22,7 +22,7 @@ html,body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 -apple
 h1,h2,.brand b,.ph-title{font-family:Montserrat,-apple-system,BlinkMacSystemFont,sans-serif}
 h1,h2,h3{margin:0;letter-spacing:-.02em}
 h1{font-size:24px;font-weight:700;letter-spacing:-.03em}h2{font-size:17px;font-weight:700;letter-spacing:-.01em}h3{font-size:15px;font-weight:600}
-.serif{font-family:Georgia,"Times New Roman",serif;font-weight:400}
+.serif{font-family:Montserrat,-apple-system,BlinkMacSystemFont,sans-serif;font-weight:700;letter-spacing:-.02em}
 button,input,select,textarea{font:inherit;color:inherit}
 .app{max-width:820px;margin:0 auto;padding:0 16px calc(96px + env(safe-area-inset-bottom))}
 header.top{position:sticky;top:0;z-index:5;background:#fff;color:var(--ink);border-bottom:1px solid var(--line);margin:0 -16px;padding:calc(12px + env(safe-area-inset-top)) 16px 12px;display:flex;align-items:center;justify-content:space-between}
@@ -56,12 +56,12 @@ nav.tabs .add span{display:none}
 .kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 @media(min-width:620px){.kpis{grid-template-columns:repeat(4,1fr)}}
 .kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
-.kpi .v{font-family:Georgia,serif;font-size:28px;line-height:1.1;margin-top:4px}
+.kpi .v{font-family:Montserrat,sans-serif;font-weight:700;letter-spacing:-.02em;font-size:28px;line-height:1.1;margin-top:4px}
 .kpi .s{font-size:12px;color:var(--mut);margin-top:4px;line-height:1.35}
 .kpi.alert{border-color:#e9c7bf;background:#fdf6f4}.kpi.alert .v{color:var(--bad)}
 .hero{background:var(--green-2);color:#fff;border-radius:16px;padding:20px;margin:12px 0;position:relative;overflow:hidden}
 .hero .eyebrow{color:var(--green-l)}
-.hero .big{font-family:Georgia,serif;font-size:40px;line-height:1.05;margin:6px 0}
+.hero .big{font-family:Montserrat,sans-serif;font-weight:700;letter-spacing:-.02em;font-size:40px;line-height:1.05;margin:6px 0}
 .hero p{margin:0;color:rgba(255,255,255,.78);font-size:14px}
 .hero::after{content:"";position:absolute;right:-40px;top:-40px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(169,188,190,.25),transparent 70%)}
 table{width:100%;border-collapse:collapse;font-size:13px}
@@ -134,7 +134,7 @@ td input{padding:6px 8px;font-size:13px}
 .tile{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px;display:flex;flex-direction:column}
 .tile.dark{background:var(--green-2);border-color:var(--green-2);color:#fff}
 .tile.dark .eyebrow{color:var(--sand)}.tile.dark .s,.tile.dark .src{color:#c9d3d2}
-.tile .v{font-family:Georgia,serif;font-size:32px;line-height:1.1;margin-top:8px}
+.tile .v{font-family:Montserrat,sans-serif;font-weight:700;letter-spacing:-.02em;font-size:32px;line-height:1.1;margin-top:8px}
 .tile .v.bad{color:var(--bad)}
 .tile .s{font-size:13px;color:var(--mut);margin-top:4px;line-height:1.35}
 .tile .src{font-size:11px;color:var(--mut);margin-top:auto;padding-top:12px}
@@ -153,7 +153,7 @@ td input{padding:6px 8px;font-size:13px}
 .stg .n{width:118px;font-size:13px;font-weight:600;flex:none}
 .stg .t{flex:1;height:12px;background:#ece9e1;border-radius:6px;overflow:hidden}
 .stg .t i{display:block;height:100%;border-radius:6px;min-width:0}
-.stg .c{width:34px;text-align:right;font-family:Georgia,serif;font-size:15px;flex:none}
+.stg .c{width:34px;text-align:right;font-family:Montserrat,sans-serif;font-weight:700;font-size:15px;flex:none}
 
 /* ---------- talk into any box, day log, toolbox ---------- */
 .micwrap{position:relative;display:block}
@@ -868,15 +868,16 @@ function viewBoard(el){
      <div class="bar"><i style="height:${Math.min(100,f*100)}%"></i><i style="height:${Math.min(100,(f+p)*100)}%;background:repeating-linear-gradient(45deg,#c9a96e 0 4px,#d6bb87 4px 8px);z-index:0;opacity:.9"></i><i style="height:${Math.min(100,f*100)}%;z-index:1"></i></div><span>${r1(w.free)} free</span></div>`}).join('')}</div>
    <div class="legend"><span><b style="background:var(--green)"></b>Booked</span><span><b style="background:repeating-linear-gradient(45deg,#c9a96e 0 4px,#d6bb87 4px 8px)"></b>Quoted, pencilled in</span><span><b style="background:#efece4;border:1px solid var(--line)"></b>Free</span></div></div>
   <div class="row between" style="margin:18px 0 8px"><h2>Every job on the board</h2>${isStaff()&&rows.length?'<span class="small muted">Drag a bar to move it</span>':''}</div>
-  ${rows.length?`<div class="gantt"><div style="width:${128+days.length*W}px">
+  ${true?`<div class="gantt"><div style="width:${128+days.length*W}px">
    <div class="g-hdr"><div class="g-lab" style="height:auto;background:#faf8f2">Job</div>${days.map(d=>`<div class="g-day ${isWork(d)?'':'we'} ${+d===+t0?'today':''}" style="width:${W}px">${d.toLocaleDateString('en-AU',{weekday:'narrow'})}<br>${d.getDate()}${d.getDate()===1||+d===+from?'<br>'+d.toLocaleDateString('en-AU',{month:'short'}):''}</div>`).join('')}</div>
    ${rows.map(({j,p})=>{const has=j.start_date&&j.end_date,s=has?Math.max(0,idx(j.start_date)):0,e=has?idx(j.end_date):0;return `<div class="g-row"><div class="g-lab" data-id="${j.id}">${esc(isMkt()?(j.suburb||'Job'):(j.clients?.name||j.title||'Job'))}<small>${esc(isMkt()?j.title||'':j.suburb||'')} · ${j.crew_size||2} crew</small></div>
     <div class="g-lane" style="width:${days.length*W}px">${days.map((d,k)=>isWork(d)?'':`<div style="position:absolute;left:${k*W}px;top:0;bottom:0;width:${W}px;background:#f6f3ec"></div>`).join('')}
     ${band(j,p)}
     <div style="position:absolute;left:${idxD(t0)*W+W/2}px;top:0;bottom:0;width:1px;background:var(--bad);opacity:.5"></div>
     ${has?`<div class="g-bar ${cls(j)} ${canDrag(j)?'drag':''}" data-id="${j.id}" ${canDrag(j)?`data-drag="${j.id}" data-base="${j.start_date}"`:''} data-tip="${esc((j.clients?.name&&!isMkt()?j.clients.name+' · ':'')+j.stage+' · '+fmtShort(j.start_date)+' to '+fmtShort(j.end_date))}" style="left:${s*W+2}px;width:${Math.max(1,e-s+1)*W-4}px">${esc(j.stage)}${j.title?' · '+esc(j.title):''}</div>`:''}</div></div>`}).join('')}
+   ${rows.length?'':`<div class="g-row"><div class="g-lab"><span class="muted" style="font-weight:400">Nothing booked</span></div><div class="g-lane" style="width:${days.length*W}px">${days.map((d,k)=>isWork(d)?'':`<div style="position:absolute;left:${k*W}px;top:0;bottom:0;width:${W}px;background:#f6f3ec"></div>`).join('')}<div style="position:absolute;left:${idxD(t0)*W+W/2}px;top:0;bottom:0;width:1px;background:var(--bad);opacity:.5"></div><div class="tiny muted" style="position:absolute;left:${idxD(t0)*W+W}px;top:14px;white-space:nowrap">Set a start date on a job and it lands here</div></div></div>`}
   </div></div>
-  <div class="legend"><span><b style="background:repeating-linear-gradient(45deg,#c9a96e 0 4px,#d6bb87 4px 8px)"></b>Lead, design or quote (pencilled)</span><span><b style="background:var(--green)"></b>Booked</span><span><b style="background:var(--green-2)"></b>On site</span><span><b style="background:#8d9a97"></b>Finished</span><span><b style="background:rgba(201,169,110,.18);border:1.5px dashed var(--sand)"></b>Promised start window</span><span><b style="background:var(--bad);width:2px"></b>Today</span></div>`:`<div class="empty">Nothing booked yet.</div>`}
+  <div class="legend"><span><b style="background:repeating-linear-gradient(45deg,#c9a96e 0 4px,#d6bb87 4px 8px)"></b>Lead, design or quote (pencilled)</span><span><b style="background:var(--green)"></b>Booked</span><span><b style="background:var(--green-2)"></b>On site</span><span><b style="background:#8d9a97"></b>Finished</span><span><b style="background:rgba(201,169,110,.18);border:1.5px dashed var(--sand)"></b>Promised start window</span><span><b style="background:var(--bad);width:2px"></b>Today</span></div>`:''}
   ${isStaff()?`<div class="card"><h2>This week on site</h2>${weekList(live,monday(t0))}</div>`:''}`;
   el.querySelectorAll('.g-lab[data-id]').forEach(b=>b.onclick=()=>isStaff()?go('job',b.dataset.id):!isMkt()&&go('cjob',b.dataset.id));
   bindDrag(el,W);
