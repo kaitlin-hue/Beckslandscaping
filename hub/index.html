@@ -364,7 +364,7 @@ async function rescheduleJob(j,sd){
 /* ---------- auth ---------- */
 async function boot(){
   const {data:{session}}=await sb.auth.getSession();
-  sb.auth.onAuthStateChange((_e,s)=>{if(!!s!==!!S.user){S.user=s?.user||null;start()}});
+  sb.auth.onAuthStateChange((e,s)=>{if(e==='PASSWORD_RECOVERY'){S.user=s?.user||null;return renderRecovery()}if(!!s!==!!S.user){S.user=s?.user||null;start()}});
   S.user=session?.user||null;start();
 }
 async function start(){
@@ -376,6 +376,16 @@ async function start(){
   $('#root').innerHTML='<div class="spinner" style="margin-top:40vh"></div>';
   await loadAll();render();
 }
+function renderRecovery(){
+  $('#root').innerHTML=`<div class="login"><div class="card">
+    <div class="brandwrap" style="justify-content:center;margin-bottom:6px"><img src="${LOGO}" alt="Beck's Landscaping"><div class="brand" style="color:var(--green-2)"><b>BECK’S LANDSCAPING</b><span style="color:var(--mut)">HUB</span></div></div>
+    <h2 style="margin:12px 0 4px">Set a new password</h2>
+    <label for="rp1">New password</label><input id="rp1" type="password" autocomplete="new-password">
+    <label for="rp2">Type it again</label><input id="rp2" type="password" autocomplete="new-password">
+    <button class="btn block" id="rpgo" style="margin-top:12px">Save and go in</button><p class="small muted" id="rpmsg" style="margin:10px 0 0"></p></div></div>`;
+  $('#rpgo').onclick=async()=>{const a=$('#rp1').value,b=$('#rp2').value;if(a.length<8)return $('#rpmsg').textContent='Use at least 8 characters';if(a!==b)return $('#rpmsg').textContent='They don’t match';
+    $('#rpgo').disabled=true;const {error}=await sb.auth.updateUser({password:a});if(error){$('#rpgo').disabled=false;return $('#rpmsg').textContent=error.message}
+    history.replaceState(null,'',location.pathname);start()}}
 function renderLogin(){
   $('#root').innerHTML=`<div class="login"><div class="card">
     <div class="brandwrap" style="justify-content:center;margin-bottom:6px"><img src="${LOGO}" alt="Beck's Landscaping"><div class="brand" style="color:var(--green-2)"><b>BECK’S LANDSCAPING</b><span style="color:var(--mut)">HUB</span></div></div>
@@ -383,7 +393,18 @@ function renderLogin(){
     <form id="lf"><label for="em">Login</label><input id="em" autocomplete="username" autocapitalize="none" placeholder="Your name, or crew" required>
     <label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" required>
     <button class="btn block" style="margin-top:12px" id="go" type="submit">Log in</button></form>
-    <p class="small muted" id="msg" style="margin:10px 0 0">Forgotten it? Ask Kaitlin.</p></div></div>`;
+    <p class="small muted" id="msg" style="margin:10px 0 0"></p>
+    <button id="forgot" type="button" style="border:0;background:none;padding:0;margin-top:10px;font:inherit;font-size:13px;color:var(--green);text-decoration:underline;cursor:pointer">Forgotten your password?</button>
+    <div id="fbox" class="hidden" style="margin-top:8px;padding-top:10px;border-top:1px solid var(--line)">
+     <label for="fl">Your login</label><input id="fl" autocapitalize="none" placeholder="greg, crew, lauren">
+     <button class="btn light block" id="fgo" type="button" style="margin-top:10px">Ask for a new password</button>
+     <p class="tiny muted" style="margin:8px 0 0">Kaitlin gets told straight away and sets you a new one. If your login is your own email, a reset link comes to you too.</p></div></div></div>`;
+  $('#forgot').onclick=()=>{$('#fbox').classList.toggle('hidden');$('#fl').value=$('#em').value;$('#fl').focus()};
+  $('#fgo').onclick=async()=>{const login=$('#fl').value.trim().toLowerCase();if(!login)return;$('#fgo').disabled=true;
+    const AKA={kaitlin:'kaitlin@vitalculture.com.au',lauren:'hattonlauren1995@gmail.com'};const email=AKA[login]||(login.includes('@')?login:null);
+    await sb.rpc('request_password_reset',{p_login:login});
+    if(email)await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+'/hub/'});
+    $('#fbox').innerHTML=`<p class="small" style="margin:0"><b>Done.</b> ${email?'Check your email for a reset link. ':''}Kaitlin has been told and will text you a new password.</p>`};
   $('#lf').onsubmit=async e=>{e.preventDefault();let email=$('#em').value.trim().toLowerCase();const password=$('#pw').value;if(!email||!password)return;
     const AKA={kaitlin:'kaitlin@vitalculture.com.au',lauren:'hattonlauren1995@gmail.com'};if(AKA[email])email=AKA[email];else if(!email.includes('@'))email+='@beckslandscaping.com.au';$('#go').disabled=true;
     const {error}=await sb.auth.signInWithPassword({email,password});
@@ -544,11 +565,11 @@ function viewJobs(el){
 
 /* ---------- board: gantt + capacity ---------- */
 /* ---------- automation log: what ran overnight, Kaitlin ticks it off ---------- */
-const ACT={deposit_invoice:'Deposit invoice drafted',deposit_paid:'Deposit paid, job booked',final_invoice:'Final invoice drafted',final_paid:'Paid in full',review_draft:'Review email drafted for approval',note:'Note'};
+const ACT={deposit_invoice:'Deposit invoice drafted',deposit_paid:'Deposit paid, job booked',final_invoice:'Final invoice drafted',final_paid:'Paid in full',review_draft:'Review email drafted for approval',reset_request:'Asked for a new password',note:'Note'};
 function toCheckCard(){
   const log=S.alog||[];if(!log.length)return '';
   const open=log.filter(l=>l.needs_check&&!l.checked_at),done=log.filter(l=>!(l.needs_check&&!l.checked_at)).slice(0,5);
-  const row=l=>{const j=S.jobs.find(x=>x.id===l.job_id);return `<div class="row between" style="padding:7px 0;border-bottom:1px solid var(--line);gap:8px"><div class="small" style="min-width:0"><b>${esc(ACT[l.action]||l.action)}${j?` · ${esc(nameOf(j))}`:''}</b><div class="tiny muted">${fmtShort(String(l.created_at).slice(0,10))}${l.amount!=null?` · ${money(l.amount)} ex GST`:''}${l.ref?` · ${esc(l.ref)}`:''}${l.detail?` · ${esc(l.detail)}`:''}</div></div>${l.checked_at?'<span class="pill good">Checked</span>':`<button class="btn light sm" data-chk="${l.id}">Checked</button>`}</div>`};
+  const row=l=>{const j=S.jobs.find(x=>x.id===l.job_id);return `<div class="row between" style="padding:7px 0;border-bottom:1px solid var(--line);gap:8px"><div class="small" style="min-width:0"><b>${esc(ACT[l.action]||l.action)}${j?` · ${esc(nameOf(j))}`:''}</b><div class="tiny muted">${fmtShort(String(l.created_at).slice(0,10))}${l.amount!=null?` · ${money(l.amount)} ex GST`:''}${l.ref?` · ${esc(l.ref)}`:''}${l.detail?` · ${esc(l.detail)}`:''}</div></div>${l.checked_at?'<span class="pill good">Checked</span>':l.action==='reset_request'?`<button class="btn sm" data-go="me">Reset</button>`:`<button class="btn light sm" data-chk="${l.id}">Checked</button>`}</div>`};
   return `<div class="card"><div class="row between"><h2>To check</h2><span class="small muted">${open.length} to tick</span></div>
    <p class="tiny muted" style="margin:4px 0 6px">What the overnight automation did in Xero and Gmail. Tick each one once you've looked at it.</p>
    ${open.length?open.map(row).join(''):'<p class="small muted" style="margin:6px 0">Nothing waiting on you.</p>'}
@@ -1598,8 +1619,14 @@ async function viewMe(el){
   $('#lo').onclick=()=>sb.auth.signOut();$('#toRates')&&($('#toRates').onclick=()=>go('rates'));el.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
   if(!isStaff())return;
   const {data:people}=await sb.from('profiles').select('*').order('created_at');
-  $('#team').innerHTML=(people||[]).map(p=>`<div class="row between" style="padding:6px 0;border-bottom:1px solid #ece9e1"><b class="small">${esc(p.name||'')}</b>
-   <select data-pid="${p.id}" style="width:auto" ${p.id===S.user.id?'disabled':''}>${['pending','crew','marketing','admin','owner'].map(r=>`<option ${r===p.role?'selected':''}>${r}</option>`).join('')}</select></div>`).join('');
+  const asked=new Set((S.alog||[]).filter(l=>l.action==='reset_request'&&!l.checked_at).map(l=>l.ref));
+  $('#team').innerHTML=(people||[]).map(p=>`<div style="padding:8px 0;border-bottom:1px solid #ece9e1"><div class="row between" style="gap:8px"><b class="small">${esc(p.name||'')}${asked.has((p.name||'').toLowerCase())?' <span class="pill warn">Asked for a reset</span>':''}</b>
+   <div class="row" style="gap:6px">${p.id===S.user.id?'':`<button class="btn light sm" data-rp="${p.id}">Reset password</button>`}<select data-pid="${p.id}" style="width:auto" ${p.id===S.user.id?'disabled':''}>${['pending','crew','marketing','admin','owner'].map(r=>`<option ${r===p.role?'selected':''}>${r}</option>`).join('')}</select></div></div>
+   <div class="hidden" id="rpb-${p.id}" style="margin-top:8px"><div class="row" style="gap:8px"><input type="text" id="rpi-${p.id}" placeholder="New password, 8 or more" autocomplete="off" style="flex:1"><button class="btn sm" data-rps="${p.id}">Set it</button></div><p class="tiny muted" style="margin:6px 0 0">You choose it, then text it to ${esc(p.name||'them')}. They can change it under their name.</p></div></div>`).join('');
+  el.querySelectorAll('[data-rp]').forEach(b=>b.onclick=()=>{$('#rpb-'+b.dataset.rp).classList.toggle('hidden');$('#rpi-'+b.dataset.rp).focus()});
+  el.querySelectorAll('[data-rps]').forEach(b=>b.onclick=async()=>{const id=b.dataset.rps,pw=$('#rpi-'+id).value;if(pw.length<8)return toast('Use at least 8 characters');b.disabled=true;
+    const {data,error}=await sb.functions.invoke('admin-set-password',{body:{user_id:id,password:pw}});b.disabled=false;
+    if(error||data?.error)return toast(data?.error||error.message);$('#rpi-'+id).value='';$('#rpb-'+id).classList.add('hidden');toast(`New password set for ${data.name}. Text it to them.`);await loadAll()});
   el.querySelectorAll('[data-pid]').forEach(s=>s.onchange=async()=>{const {error}=await sb.from('profiles').update({role:s.value}).eq('id',s.dataset.pid);toast(error?error.message:'Updated')});
 }
 
