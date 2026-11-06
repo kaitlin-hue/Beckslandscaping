@@ -1323,11 +1323,12 @@ function viewReview(el){
     if(error){$('#save').disabled=false;return toast(error.message)}
     const rows=layoutTasks(saved,j.tasks.filter(t=>t.task_type||t.description).map((t,i)=>({job_id:saved.id,seq:i,task_type:t.task_type,description:t.description,qty:t.qty,unit:t.unit,est_hours:t.est_hours,crew_size:t.crew_size,materials:t.materials||[],sell_price:t.sell_price})));
     if(rows.length)await sb.from('job_tasks').insert(rows);
+    if(S.toQuote)await fillQuoteFromNotes(saved,j);
     const cdays=[];for(const l of log){if(!l.date)continue;const h=+l.hours_each||8;for(const n of (l.names||[])){const c=crewMatch(n);cdays.push({job_id:saved.id,crew_id:c?.id||null,crew_name:c?.name||n,work_date:l.date,hours:h,charge:Math.round((c?.charge_per_day||DAY_RATE())*h/8*100)/100,note:l.note||null})}}
     if(cdays.length)await sb.from('crew_days').insert(cdays);
     await sb.from('checkpoints').insert({job_id:saved.id,stage:job.stage});
     for(const[i,src]of S.draft.images.entries()){const blob=await(await fetch(src)).blob();const path=`${saved.id}/page-${Date.now()}-${i}.jpg`;const up=await sb.storage.from('job-files').upload(path,blob,{contentType:'image/jpeg'});if(!up.error)await sb.from('attachments').insert({job_id:saved.id,path,kind:'drawing'})}
-    S.draft=null;S.prefill=null;await loadAll();const tq=S.toQuote;S.toQuote=false;toast(tq?'Job saved. Build the quote':'Job saved');go(tq?'quote':'job',saved.id)};
+    S.draft=null;S.prefill=null;await loadAll();const tq=S.toQuote;S.toQuote=false;toast(tq?'First draft of the quote is in. Check each line':'Job saved');go(tq?'quote':'job',saved.id)};
 }
 
 /* ---------- job detail ---------- */
@@ -1354,6 +1355,23 @@ function bindNewJobEd(el){$('#nj').onclick=()=>{const b=$('#njbox');b.open=true;
     if(!cid){const {data,error}=await sb.from('clients').insert({name,phone:$('#nj_p').value||null,email:$('#nj_e').value||null,suburb:$('#nj_s').value||null,source:$('#nj_src').value||null}).select().single();if(error){$('#nj_go').disabled=false;return toast(error.message)}cid=data.id}
     const {data:jid,error}=await sb.rpc('editor_save_job',{p_id:null,p:{client_id:cid,stage:'Lead',title:$('#nj_t').value||null,suburb:$('#nj_s').value||null,lead_source:$('#nj_src').value||null,notes:$('#nj_notes').value||null}});
     $('#nj_go').disabled=false;if(error)return toast(error.message);await loadAll();toast('Added as a lead');go('job',jid)}}
+/* ---------- photo or voice to a first draft quote: labour, materials from the price book, priced items ---------- */
+function matchRate(name){const w=(String(name||'').toLowerCase().match(/[a-z0-9]+/g)||[]).map(x=>x.length>4?x.replace(/(es|s)$/,''):x);if(!w.length)return null;let best=null,score=0;
+  for(const r of S.rates||[]){const rw=String(r.task_type||'').toLowerCase();const hit=w.filter(x=>x.length>2&&rw.includes(x)).length;const sc=hit/Math.max(2,w.filter(x=>x.length>2).length);
+    if(sc>score||(sc===score&&best&&r.material_cost_per_unit!=null&&best.material_cost_per_unit==null)){score=sc;best=r}}
+  return score>=0.6?best:null}
+async function fillQuoteFromNotes(job,j){
+  const tasks=(j.tasks||[]).filter(t=>t.task_type||t.description),lines=[];let seq=0;
+  const hrs=jobHours(tasks),hpd=+S.settings.hours_per_day||8;
+  if(hrs){const c=S.crew.filter(c=>c.cost_per_day);const cost=c.length?c.reduce((a,c)=>a+(+c.cost_per_day),0)/c.length:null;
+    lines.push({job_id:job.id,seq:seq++,kind:'Labour',item:'Labour',description:`${r1(hrs/hpd)} crew days`,qty:r1(hrs/hpd),unit:'crew day',unit_cost:cost,unit_price:DAY_RATE()})}
+  for(const t of tasks){const mats=t.materials||[];
+    for(const m of mats){const r=matchRate(m.item);const qty=+m.qty||1;
+      lines.push({job_id:job.id,seq:seq++,kind:'Materials',item:r?r.task_type:m.item,description:t.task_type||null,qty,unit:m.unit||r?.unit||null,
+        unit_cost:r?.material_cost_per_unit??null,supplier:r?.supplier||null,unit_price:m.unit_price!=null?+m.unit_price:(m.total&&qty?Math.round(m.total/qty*100)/100:(r?.sell_rate_per_unit??null))})}
+    if(!mats.length&&t.sell_price)lines.push({job_id:job.id,seq:seq++,kind:'Other',item:t.task_type||'Item',description:t.description||null,qty:1,unit:'job',unit_cost:null,unit_price:+t.sell_price})}
+  if(!lines.length)return;
+  const {error}=await sb.from('quote_lines').insert(lines);if(error)toast('Quote lines not added: '+error.message)}
 async function viewJob(el){
   const j=S.jobs.find(x=>x.id===S.jobId);if(!j)return go('jobs');
   const ts=tasksFor(j.id),cd=daysFor(j.id).sort((a,b)=>a.work_date.localeCompare(b.work_date)),cs=costsFor(j.id),n=numbersFor(j);
