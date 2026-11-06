@@ -479,7 +479,7 @@ const IC={clients:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" s
  nums:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
  mkt:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11v2a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1zM16 8a5 5 0 0 1 0 8"/></svg>'
 };
-function go(v,id){S.view=v;if(id!==undefined)S.jobId=id;render();scrollTo(0,0)}
+function go(v,id){stopDictate();S.view=v;if(id!==undefined)S.jobId=id;render();scrollTo(0,0)}
 function render(){
   // phone bar keeps five or six; items marked desk only show in the desktop sidebar (and on the Me page)
   const tabs=isStaff()?[['home','Today',IC.home],['jobs','Jobs',IC.jobs],['clients','Clients',IC.clients,'desk'],['board','Board',IC.board],['add','Log the day',IC.add],['tool','Toolbox',IC.tool],['nums','Numbers',IC.nums],['brain','Brain',IC.tool,'desk'],['activity','Activity',IC.nums,'desk'],['money','Money',IC.lock,'desk'],['mkt','Marketing',IC.mkt,'desk']]
@@ -1046,17 +1046,25 @@ async function viewMarketing(el){
 
 /* ---------- talk into any box ---------- */
 const SRC=window.SpeechRecognition||window.webkitSpeechRecognition;let dict=null;
-function dictate(field,btn){
+function dictate(field,btn,onState){
   if(!SRC){field.focus();return toast('Use the mic on your keyboard')}
-  if(dict){const was=dict.btn;dict.r.stop();if(was===btn)return}
+  // tapping the live mic again always stops it, straight away, even if the phone is slow to let go
+  if(dict){const was=dict.btn;stopDictate();if(was===btn)return}
   const r=new SRC();r.lang='en-AU';r.continuous=true;r.interimResults=true;
   const base=field.value?field.value.replace(/\s*$/,' '):'';let fin='';
-  r.onresult=ev=>{let interim='';for(let i=ev.resultIndex;i<ev.results.length;i++){const x=ev.results[i];if(x.isFinal)fin+=x[0].transcript+' ';else interim+=x[0].transcript}
+  const d={r,btn,field,onState,stopped:false};
+  d.finish=()=>{if(d.stopped)return;d.stopped=true;clearTimeout(d.cap);btn.classList.remove('live');onState&&onState(false);
+    field.dispatchEvent(new Event('input',{bubbles:true}));field.dispatchEvent(new Event('change',{bubbles:true}));if(dict===d)dict=null};
+  r.onresult=ev=>{if(d.stopped)return;let interim='';for(let i=ev.resultIndex;i<ev.results.length;i++){const x=ev.results[i];if(x.isFinal)fin+=x[0].transcript+' ';else interim+=x[0].transcript}
     field.value=base+fin+interim;field.dispatchEvent(new Event('input',{bubbles:true}))};
-  r.onend=()=>{btn.classList.remove('live');field.value=(base+fin).trim()||field.value;field.dispatchEvent(new Event('input',{bubbles:true}));field.dispatchEvent(new Event('change',{bubbles:true}));if(dict&&dict.r===r)dict=null};
-  r.onerror=ev=>toast(ev.error==='not-allowed'?'Allow the microphone in settings':'Mic stopped');
-  r.start();btn.classList.add('live');dict={r,btn};
+  r.onend=()=>d.finish();
+  r.onerror=ev=>{if(ev.error!=='aborted'&&ev.error!=='no-speech')toast(ev.error==='not-allowed'||ev.error==='service-not-allowed'?'Allow the microphone in settings, or use the mic on your keyboard':'Mic stopped');d.finish()};
+  try{r.start()}catch(e){return toast('Use the mic on your keyboard')}
+  btn.classList.add('live');onState&&onState(true);dict=d;
+  d.cap=setTimeout(()=>stopDictate(),4*60*1000);
 }
+function stopDictate(){const d=dict;if(!d)return;d.finish();try{d.r.stop()}catch(e){}setTimeout(()=>{try{d.r.abort()}catch(e){}},600)}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)stopDictate()});
 function addMics(root){
   root.querySelectorAll('textarea:not([data-nomic]):not(.has-mic),input[data-mic]:not(.has-mic)').forEach(f=>{
     if(f.id==='tx')return;
@@ -1084,7 +1092,7 @@ function viewDay(el){
   <div class="card small muted">Say who, which job, start and finish times, who moved between jobs, and any problems. It comes back for you to check before anything saves.</div>`;
   bindToggle();
   $('#tx').oninput=e=>d.transcript=e.target.value;$('#dd').onchange=e=>d.date=e.target.value;
-  $('#mic').onclick=()=>dictate($('#tx'),$('#mic'));
+  $('#mic').onclick=()=>dictate($('#tx'),$('#mic'),on=>{$('#ms')&&($('#ms').textContent=on?'Listening. Tap to stop':'Tap to keep talking')});
   $('#manual').onclick=()=>{S.dayDraft={date:d.date,entries:[{name:'',job_id:'',hours:+(S.settings.hours_per_day||8)}],issues:[],new_people:[],questions:[]};go('dayrev')};
   $('#read').onclick=async()=>{d.transcript=$('#tx').value.trim();if(!d.transcript)return toast('Talk it through first');
     $('#read').disabled=true;$('#read').textContent='Reading it…';
@@ -1249,12 +1257,7 @@ function viewAdd(el){
   th();$('#th').onclick=e=>{if(e.target.dataset.i!=null){S.draft.images.splice(+e.target.dataset.i,1);th()}};
   $('#tx').oninput=e=>S.draft.transcript=e.target.value;
   $('#ph').onchange=async e=>{for(const f of e.target.files)S.draft.images.push(await shrink(f));th()};
-  $('#mic').onclick=()=>{if(!SR){$('#tx').focus();return}if(rec){rec.stop();return}
-    rec=new SR();rec.lang='en-AU';rec.continuous=true;rec.interimResults=true;const base=S.draft.transcript?S.draft.transcript.trim()+' ':'';let fin='';
-    rec.onresult=ev=>{let interim='';for(let i=ev.resultIndex;i<ev.results.length;i++){const r=ev.results[i];if(r.isFinal)fin+=r[0].transcript+' ';else interim+=r[0].transcript}$('#tx').value=base+fin+interim;S.draft.transcript=base+fin};
-    rec.onend=()=>{rec=null;$('#mic')?.classList.remove('live');$('#ms')&&($('#ms').textContent='Tap to keep talking');S.draft.transcript=$('#tx').value};
-    rec.onerror=ev=>toast(ev.error==='not-allowed'?'Allow the microphone in settings':'Mic stopped');
-    rec.start();$('#mic').classList.add('live');$('#ms').textContent='Listening. Tap to stop'};
+  $('#mic').onclick=()=>dictate($('#tx'),$('#mic'),on=>{$('#ms')&&($('#ms').textContent=on?'Listening. Tap to stop':'Tap to keep talking')});
   bindToggle();
   $('#manual').onclick=()=>{S.draft.job={tasks:[{task_type:'',description:'',est_hours:8}]};go('review')};
   $('#build').onclick=async()=>{S.draft.transcript=$('#tx').value.trim();
