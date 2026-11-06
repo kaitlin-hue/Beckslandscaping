@@ -46,12 +46,12 @@ Deno.serve(async (req) => {
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
     });
-    const { data: staff } = await sb.rpc("is_staff");
+    const { data: staff } = await sb.rpc("can_edit");
     if (!staff) return json({ error: "Not allowed" }, 403);
     const { transcript = "", job_id } = await req.json();
     if (!transcript) return json({ error: "Nothing to read" }, 400);
     const [{ data: job }, { data: tasks }, { data: settings }] = await Promise.all([
-      sb.from("jobs").select("title,suburb,crew_size,notes,tools").eq("id", job_id).maybeSingle(),
+      sb.from("jobs_safe").select("title,suburb,crew_size,notes,tools").eq("id", job_id).maybeSingle(),
       sb.from("job_tasks").select("task_type,description,qty,unit,est_hours").eq("job_id", job_id).order("seq"),
       sb.from("settings").select("hours_per_day,default_crew").single(),
     ]);

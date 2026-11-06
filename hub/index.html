@@ -406,8 +406,15 @@ async function rescheduleJob(j,sd){
 }
 
 /* ---------- auth ---------- */
+/* stay logged in: 30 days on this device, or until the browser closes */
+const KEEP_DAYS=30;
+function lsTry(f){try{return f()}catch(e){return null}}
+function setKeep(on){lsTry(()=>{localStorage.setItem('bh_keep',on?String(Date.now()+KEEP_DAYS*864e5):'session');sessionStorage.setItem('bh_live','1')})}
 async function boot(){
-  const {data:{session}}=await sb.auth.getSession();
+  let {data:{session}}=await sb.auth.getSession();
+  if(session){const k=lsTry(()=>localStorage.getItem('bh_keep'));
+    const expired=k==='session'?!lsTry(()=>sessionStorage.getItem('bh_live')):k?Date.now()>+k:false;
+    if(expired){await sb.auth.signOut();session=null}else if(!k)setKeep(true)}
   sb.auth.onAuthStateChange((e,s)=>{if(e==='PASSWORD_RECOVERY'){S.user=s?.user||null;return renderRecovery()}if(!!s!==!!S.user){S.user=s?.user||null;start()}});
   S.user=session?.user||null;start();
 }
@@ -436,7 +443,9 @@ function renderLogin(){
     <p class="small muted" style="margin:12px 0 4px">Jobs, board, numbers.</p>
     <form id="lf"><label for="em">Login</label><input id="em" autocomplete="username" autocapitalize="none" placeholder="Your name, or crew" required>
     <label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" required>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-weight:500;color:var(--ink)"><input type="checkbox" id="keep" checked style="width:auto"> Keep me logged in for 30 days</label>
     <button class="btn block" style="margin-top:12px" id="go" type="submit">Log in</button></form>
+    <p class="tiny muted" style="margin:8px 0 0">Your phone will offer to save the password. Tap Save.</p>
     <p class="small muted" id="msg" style="margin:10px 0 0"></p>
     <button id="forgot" type="button" style="border:0;background:none;padding:0;margin-top:10px;font:inherit;font-size:13px;color:var(--green);text-decoration:underline;cursor:pointer">Forgotten your password?</button>
     <div id="fbox" class="hidden" style="margin-top:8px;padding-top:10px;border-top:1px solid var(--line)">
@@ -451,6 +460,7 @@ function renderLogin(){
     $('#fbox').innerHTML=`<p class="small" style="margin:0"><b>Done.</b> ${email?'Check your email for a reset link. ':''}Kaitlin has been told and will text you a new password.</p>`};
   $('#lf').onsubmit=async e=>{e.preventDefault();let email=$('#em').value.trim().toLowerCase();const password=$('#pw').value;if(!email||!password)return;
     const AKA={kaitlin:'kaitlin@vitalculture.com.au',lauren:'hattonlauren1995@gmail.com'};if(AKA[email])email=AKA[email];else if(!email.includes('@'))email+='@beckslandscaping.com.au';$('#go').disabled=true;
+    setKeep($('#keep').checked);
     const {error}=await sb.auth.signInWithPassword({email,password});
     if(error){$('#msg').textContent='That login or password didn’t work. Ask Kaitlin if you’re stuck.';$('#pw').value=''}
     $('#go').disabled=false};
